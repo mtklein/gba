@@ -44,7 +44,7 @@ typedef struct {
 /* Sprite attribute helpers */
 #define ATTR0_REG     (0<<8)
 #define ATTR0_HIDE    (2<<8)
-#define ATTR0_4BPP    0
+#define ATTR0_8BPP    0x2000
 #define ATTR0_SQUARE  0
 #define ATTR0_TALL    0x8000
 
@@ -63,11 +63,10 @@ static inline void obj_set_pos(volatile ObjAttr* obj, int x, int y) {
 }
 
 static void loadSolidTile(int tileIndex, uint8_t color) {
-    volatile uint32_t* tile = &SPRITE_GFX[tileIndex * 8];
-    uint32_t c = (uint32_t)(color & 0xF);
-    uint32_t packed = c | (c<<4) | (c<<8) | (c<<12) |
-                      (c<<16) | (c<<20) | (c<<24) | (c<<28);
-    for(int i=0;i<8;i++) tile[i] = packed;
+    volatile uint32_t* tile = &SPRITE_GFX[tileIndex * 16];
+    uint32_t c = (uint32_t)color & 0xFFu;
+    uint32_t packed = c | (c<<8) | (c<<16) | (c<<24);
+    for(int i=0;i<16;i++) tile[i] = packed;
 }
 
 static void initSprites(void) {
@@ -77,9 +76,9 @@ static void initSprites(void) {
     loadSolidTile(TILE_BALL, COLOR_WHITE);
 
     /* set initial attributes */
-    obj_set_attr(&OAM[0], ATTR0_REG | ATTR0_TALL | ATTR0_4BPP, ATTR1_SIZE_8x32, TILE_PADDLE_L);
-    obj_set_attr(&OAM[1], ATTR0_REG | ATTR0_TALL | ATTR0_4BPP, ATTR1_SIZE_8x32, TILE_PADDLE_R);
-    obj_set_attr(&OAM[2], ATTR0_REG | ATTR0_SQUARE | ATTR0_4BPP, ATTR1_SIZE_8, TILE_BALL);
+    obj_set_attr(&OAM[0], ATTR0_REG | ATTR0_TALL | ATTR0_8BPP, ATTR1_SIZE_8x32, TILE_PADDLE_L);
+    obj_set_attr(&OAM[1], ATTR0_REG | ATTR0_TALL | ATTR0_8BPP, ATTR1_SIZE_8x32, TILE_PADDLE_R);
+    obj_set_attr(&OAM[2], ATTR0_REG | ATTR0_SQUARE | ATTR0_8BPP, ATTR1_SIZE_8, TILE_BALL);
     for(int i=3;i<128;i++) obj_set_attr(&OAM[i], ATTR0_HIDE, 0, 0);
 }
 
