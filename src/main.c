@@ -7,7 +7,6 @@
 #define BG2_ENABLE (1<<10)
 #define PALETTE ((volatile uint16_t*)0x5000000)
 
-#define REG_VCOUNT (*(volatile uint16_t*)0x4000006)
 #define REG_KEYINPUT (*(volatile uint16_t*)0x4000130)
 
 #define KEY_A      (1<<0)
@@ -40,8 +39,7 @@ static inline void flipPage(void) {
 }
 
 static inline void waitForVBlank(void) {
-    while(REG_VCOUNT >= 160);
-    while(REG_VCOUNT < 160);
+    __asm__ volatile("swi 0x05" ::: "r0", "r1", "r2", "r3", "r12", "lr", "memory");
 }
 
 static inline uint16_t keysCurrent(void) {
