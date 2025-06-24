@@ -1,11 +1,12 @@
 cflags = -target armv4t-none-eabi -march=armv4t -nostdlib -ffreestanding -Wall -O2
-ldflags = -fuse-ld=lld -T linker.ld
+# Use LLD directly when linking so that Apple's clang can be used on macOS.
+ldflags = -T linker.ld -m armelf
 
 rule cc
   command = clang $cflags -c $in -o $out
 
 rule link
-  command = clang $cflags $in -o $out $ldflags
+  command = ld.lld $ldflags $in -o $out
 
 rule objcopy
   command = llvm-objcopy-19 -O binary $in $out
