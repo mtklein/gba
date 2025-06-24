@@ -1,6 +1,7 @@
 #include <stdint.h>
-#include <stdbool.h>
 #include "font.h"
+
+#define len(x) (int)(sizeof x / sizeof *x)
 
 static int const W = 240,
                  H = 160;
@@ -76,24 +77,20 @@ static void clear(uint16_t *fb, uint8_t color) {
     if (dma[3].cnt & (1u<<31)) __builtin_trap();
 }
 
-static inline uint16_t keys_curr(void) {
-    return ~*reg_keys & 0x03FF;
-}
-
 static void draw_char(uint16_t *fb, int x, int y, char ch, uint8_t color) {
     uint8_t const *glyph = font_get(ch);
-    for (int r = 0; r < 8; r++) {
-        uint8_t bits = glyph[r];
-        for (int c = 0; c < 8; c++) {
-            if (bits & (1 << (7 - c)))
-                set_pixel(fb, x+c, y+r, color);
+    for (int r = 0; r < 8; r++)
+    for (int c = 0; c < 8; c++) {
+        if (glyph[r] & (1 << (7 - c))) {
+            set_pixel(fb, x+c, y+r, color);
         }
     }
 }
 
 static void draw_str(uint16_t *fb, int x, int y, char const *s, uint8_t color) {
-    for (; *s; s++, x += 8)
-        draw_char(fb, x, y, *s, color);
+    for (; *s; x += 8) {
+        draw_char(fb, x, y, *s++, color);
+    }
 }
 
 __attribute__((optnone))
@@ -108,134 +105,131 @@ static void draw_num(uint16_t *fb, int x, int y, int v, uint8_t color) {
 }
 
 
-static int const paddle_h    = 30,
-                 paddle_w    = 4,
-                 ball_size   = 4,
+static int const paddle_h     = 30,
+                 paddle_w     = 4,
                  paddle_speed = 3,
-                 ball_speed   = 768;
+                 ball_size    = 4,
+                 ball_speed   = 384;
 
-struct paddle { int y; };
-struct ball { int x,y,vx,vy; };
+struct paddle { int const x; int y; };  // integer pixels
+struct ball { int x,y,vx,vy; };         // .8 fixed point pixels
 
-static union rgb555 const warm[] = {
-    {.r=31,.g=0, .b=0 },
-    {.r=31,.g=10,.b=0 },
-    {.r=31,.g=20,.b=0 },
-    {.r=31,.g=31,.b=0 },
+static union rgb555 const warm_color[] = {
+    {.r=31, .g= 0, .b= 0},
+    {.r=25, .g= 0, .b=20},
+    {.r=31, .g=20, .b= 0},
+    {.r=25, .g=25, .b= 0},
 };
-static union rgb555 const cool[] = {
-    {.r=0, .g=0, .b=31},
-    {.r=0, .g=31,.b=31},
-    {.r=0, .g=31,.b=0 },
-    {.r=10,.g=10,.b=31},
+static union rgb555 const cool_color[] = {
+    {.r= 0, .g= 0, .b=31},
+    {.r= 0, .g=25, .b=25},
+    {.r= 0, .g=31, .b= 0},
+    {.r=10, .g=10, .b=20},
 };
-static int const NUM_WARM = sizeof(warm)/sizeof(warm[0]);
 
 void main(void) {
     *reg_dispcnt = 4 | (1<<10);
 
     enum {BG,BALL,LEFT,RIGHT};
-    palette[BG  ] = ((union rgb555){.r=31,.g=31,.b=31}).rgbx;
-    palette[BALL] = ((union rgb555){.r=0, .g=0, .b=0 }).rgbx;
-    palette[LEFT ] = warm[0].rgbx;
-    palette[RIGHT] = cool[0].rgbx;
+    palette[BG   ] = ((union rgb555){.r=31,.g=31,.b=31}).rgbx;
+    palette[BALL ] = ((union rgb555){.r=0, .g=0, .b=0 }).rgbx;
+    palette[LEFT ] = warm_color->rgbx;
+    palette[RIGHT] = cool_color->rgbx;
 
     clear(front_fb, BG);
     clear( back_fb, BG);
 
-    struct paddle left  = {.y = (H - paddle_h)/2};
-    struct paddle right = {.y = (H - paddle_h)/2};
+    struct paddle left  = {.x=           10, .y = (H - paddle_h)/2};
+    struct paddle right = {.x=W-10-paddle_w, .y = (H - paddle_h)/2};
     struct ball ball = {
-        .x = (W/2 - ball_size/2) << 8,
-        .y = (H/2 - ball_size/2) << 8,
+        .x  = (W/2 - ball_size/2) << 8,
+        .y  = (H/2 - ball_size/2) << 8,
         .vx = -ball_speed,
         .vy = 0,
     };
 
-    int score1 = 0, score2 = 0;
-    int warm_idx = 0;
-    bool game_over = false;
-    int winner = 0;
+    int score1 = 0,
+        score2 = 0,
+        winner = 0,
+          warm = 0,
+          cool = 0;
 
+    uint16_t keys = 0, held;
     for (uint16_t *fb; (fb = vsync_swap());) {
-        uint16_t keys = keys_curr();
+        held = keys;
+        keys = ~*reg_keys;
 
-        if (!game_over) {
-            if (keys & (1<<6)) { if (left.y > 0) left.y -= paddle_speed; }
-            if (keys & (1<<7)) { if (left.y < H-paddle_h) left.y += paddle_speed; }
-            if (keys & (1<<0)) { if (right.y > 0) right.y -= paddle_speed; }
+        if (!winner) {
+            if (keys & (1<<6)) { if ( left.y >          0)  left.y -= paddle_speed; }
+            if (keys & (1<<7)) { if ( left.y < H-paddle_h)  left.y += paddle_speed; }
+            if (keys & (1<<0)) { if (right.y >          0) right.y -= paddle_speed; }
             if (keys & (1<<1)) { if (right.y < H-paddle_h) right.y += paddle_speed; }
 
-            static uint16_t prev = 0; // for edge detection
-            if ((keys & (1<<2)) && !(prev & (1<<2))) {
-                warm_idx = (warm_idx+1)%NUM_WARM;
-                palette[LEFT] = warm[warm_idx].rgbx;
+            if ((keys & (1<<2)) && !(held & (1<<2))) {
+                palette[LEFT]  = warm_color[++warm % len(warm_color)].rgbx;
             }
-            prev = keys;
+            if ((keys & (1<<3)) && !(held & (1<<3))) {
+                palette[RIGHT] = cool_color[++cool % len(cool_color)].rgbx;
+            }
 
             ball.x += ball.vx;
             ball.y += ball.vy;
 
-            int bx = ball.x>>8;
-            int by = ball.y>>8;
+            int const bx = ball.x >> 8,
+                      by = ball.y >> 8;
 
-            if (by <=0 && ball.vy<0) ball.vy = -ball.vy;
-            if (by >= H-ball_size && ball.vy>0) ball.vy = -ball.vy;
+            if (by <= 0           && ball.vy < 0) { ball.vy = -ball.vy; }
+            if (by >= H-ball_size && ball.vy > 0) { ball.vy = -ball.vy; }
 
-            int left_x  = 10;
-            int right_x = W-10-paddle_w;
-
-            if (bx <= left_x + paddle_w &&
-                bx + ball_size >= left_x &&
-                by + ball_size >= left.y && by <= left.y + paddle_h) {
-                int offset = (by + ball_size/2) - (left.y + paddle_h/2);
-                ball.x = (left_x + paddle_w)<<8;
-                ball.vx = ball_speed;
+            if (1 && bx + ball_size >= left.x
+                  && by + ball_size >= left.y
+                  && bx <= left.x + paddle_w
+                  && by <= left.y + paddle_h) {
+                int const offset = (by + ball_size/2) - (left.y + paddle_h/2);
+                ball.x  = (left.x + paddle_w) << 8;
+                ball.vx = +ball_speed;
                 ball.vy = offset*32;
             }
-            if (bx + ball_size >= right_x &&
-                bx <= right_x + paddle_w &&
-                by + ball_size >= right.y && by <= right.y + paddle_h) {
-                int offset = (by + ball_size/2) - (right.y + paddle_h/2);
-                ball.x = (right_x - ball_size)<<8;
+            if (1 && bx + ball_size >= right.x
+                  && by + ball_size >= right.y
+                  && bx <= right.x + paddle_w
+                  && by <= right.y + paddle_h) {
+                int const offset = (by + ball_size/2) - (right.y + paddle_h/2);
+                ball.x  = (right.x - ball_size) << 8;
                 ball.vx = -ball_speed;
                 ball.vy = offset*32;
             }
 
             if (bx < 0) {
                 score2++;
-                ball.x = (W/2)<<8;
-                ball.y = (H/2)<<8;
-                ball.vx = ball_speed;
+                ball.x  = (W/2)<<8;
+                ball.y  = (H/2)<<8;
+                ball.vx = +ball_speed;
                 ball.vy = 0;
-                left.y = right.y = (H - paddle_h)/2;
-            } else if (bx > W-ball_size) {
+            }
+            if (bx > W - ball_size) {
                 score1++;
-                ball.x = (W/2)<<8;
-                ball.y = (H/2)<<8;
+                ball.x  = (W/2)<<8;
+                ball.y  = (H/2)<<8;
                 ball.vx = -ball_speed;
                 ball.vy = 0;
-                left.y = right.y = (H - paddle_h)/2;
             }
 
             int diff = score1 - score2;
-            if ((score1 >=11 || score2 >=11) && (diff>=2 || diff<=-2)) {
-                game_over = true;
+            if ((score1 >= 11 || score2 >= 11) && (diff >= 2 || diff <= -2)) {
                 winner = diff > 0 ? 1 : 2;
             }
         }
 
         clear(fb, BG);
-        int left_x  = 10;
-        int right_x = W-10-paddle_w;
-        fill_rect(fb, left_x,  left.y, paddle_w, paddle_h, LEFT);
-        fill_rect(fb, right_x, right.y, paddle_w, paddle_h, RIGHT);
-        fill_rect(fb, ball.x>>8, ball.y>>8, ball_size, ball_size, BALL);
-        draw_num(fb, 30,10, score1, LEFT);
+        fill_rect(fb,  left.x   ,  left.y   ,  paddle_w,  paddle_h,  LEFT);
+        fill_rect(fb, right.x   , right.y   ,  paddle_w,  paddle_h, RIGHT);
+        fill_rect(fb,  ball.x>>8,  ball.y>>8, ball_size, ball_size,  BALL);
+        draw_num(fb,                      30,10, score1, LEFT);
         draw_num(fb, W-30-8*(score2>=10?2:1),10, score2, RIGHT);
-        if (game_over) {
-            char const *msg = winner==1?"P1 WINS!":"P2 WINS!";
-            draw_str(fb, (W-8*7)/2, H/2-4, msg, winner==1?LEFT:RIGHT);
+        if (winner) {
+            char const *msg = winner==1 ? "P1 WINS!" : "P2 WINS!";
+            draw_str(fb, (W-8*7)/2, H/2-4, msg, winner==1 ? LEFT : RIGHT);
         }
     }
 }
