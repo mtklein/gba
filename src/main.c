@@ -19,7 +19,19 @@
 #define SCREEN_WIDTH 240
 #define SCREEN_HEIGHT 160
 
-#define VIDEO_BUFFER ((volatile uint16_t*)0x6000000)
+#define FRONT_BUFFER ((volatile uint16_t*)0x6000000)
+#define BACK_BUFFER  ((volatile uint16_t*)0x600A000)
+
+static volatile uint16_t* videoBuffer = BACK_BUFFER;
+static inline void flipPage(void) {
+    if(videoBuffer == FRONT_BUFFER) {
+        videoBuffer = BACK_BUFFER;
+        REG_DISPCNT |= (1<<4);
+    } else {
+        videoBuffer = FRONT_BUFFER;
+        REG_DISPCNT &= ~(1<<4);
+    }
+}
 
 static inline void waitForVBlank(void) {
     while(REG_VCOUNT >= 160);
@@ -32,7 +44,7 @@ static inline uint16_t keysCurrent(void) {
 
 static inline void drawPixel(int x, int y, uint16_t color) {
     if(x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT) return;
-    VIDEO_BUFFER[y * SCREEN_WIDTH + x] = color;
+    videoBuffer[y * SCREEN_WIDTH + x] = color;
 }
 
 static void fillRect(int x, int y, int w, int h, uint16_t color) {
@@ -43,7 +55,7 @@ static void fillRect(int x, int y, int w, int h, uint16_t color) {
 
 static void clearScreen(uint16_t color) {
     for(int i=0;i<SCREEN_WIDTH*SCREEN_HEIGHT;i++)
-        VIDEO_BUFFER[i] = color;
+        videoBuffer[i] = color;
 }
 
 static void drawChar(int x, int y, char ch, uint16_t color) {
@@ -79,8 +91,8 @@ static void drawNumber(int x, int y, int val, uint16_t color) {
 #define PADDLE_HEIGHT 30
 #define PADDLE_WIDTH 4
 #define BALL_SIZE 4
-#define PADDLE_SPEED 2
-#define BALL_SPEED 512
+#define PADDLE_SPEED 3
+#define BALL_SPEED 768
 
 typedef struct { int y; } Paddle;
 
@@ -240,8 +252,6 @@ int main(void) {
             }
             updateParticles();
         }
-
-        waitForVBlank();
         clearScreen(RGB15(0,0,0));
         fillRect(leftX, left.y, PADDLE_WIDTH, PADDLE_HEIGHT, leftColor);
         fillRect(rightX, right.y, PADDLE_WIDTH, PADDLE_HEIGHT, rightColor);
@@ -254,5 +264,8 @@ int main(void) {
             int msgWidth = 8*7; // 7 chars
             drawString((SCREEN_WIDTH-msgWidth)/2, SCREEN_HEIGHT/2-4, msg, winner==1?leftColor:rightColor);
         }
+
+        waitForVBlank();
+        flipPage();
     }
 }
