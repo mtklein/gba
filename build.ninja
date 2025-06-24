@@ -1,21 +1,22 @@
-brewpaths = /opt/homebrew/opt/lld/bin:/opt/homebrew/opt/llvm/bin
-cflags = -target armv4t-none-eabi -march=armv4t -nostdlib -ffreestanding -Wall -O2
-# Use LLD directly when linking so that Apple's clang can be used on macOS.
-ldflags = -T linker.ld -m armelf
+builddir = out
 
-rule cc
-  command = PATH=$brewpaths:$$PATH clang $cflags -c $in -o $out
+path = /opt/homebrew/opt/lld/bin:/opt/homebrew/opt/llvm/bin:$$PATH
+arch = -target armv4t-none-eabi -march=armv4t
+warn = -Weverything -Wno-unsafe-buffer-usage
+
+rule assemble
+  command = PATH=$path clang $arch -c $in -o $out
+
+rule compile
+  command = PATH=$path clang $arch -c $in -o $out -O1 -Werror $warn -fcolor-diagnostics
 
 rule link
-  command = PATH=$brewpaths:$$PATH ld.lld $ldflags $in -o $out
+  command = PATH=$path ld.lld -T linker.ld -m armelf $in -o $out
 
 rule objcopy
-  command = PATH=$brewpaths:$$PATH ./objcopy.sh -O binary $in $out
+  command = PATH=$path llvm-objcopy -O binary $in $out
 
-build build/crt0.o: cc src/crt0.s
-build build/main.o: cc src/main.c
-
-build build/hello.elf: link build/crt0.o build/main.o
-build hello.gba: objcopy build/hello.elf
-
-default hello.gba
+build out/main.o:    compile  src/main.c
+build out/crt0.o:    assemble src/crt0.s
+build out/hello.elf: link     out/main.o out/crt0.o
+build hello.gba:     objcopy  out/hello.elf

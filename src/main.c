@@ -7,7 +7,6 @@
 
 #define VIDEO_BUFFER ((volatile uint16_t*)0x6000000)
 #define SCREEN_WIDTH 240
-#define SCREEN_HEIGHT 160
 
 static inline void drawPixel(int x, int y, uint16_t color) {
     VIDEO_BUFFER[y * SCREEN_WIDTH + x] = color;
@@ -37,5 +36,4 @@ int main(void) {
     REG_DISPCNT = MODE3 | BG2_ENABLE;
     drawString(10, 10, "HELLO WORLD", RGB15(31,31,31));
     for(;;) { }
-    return 0;
 }
