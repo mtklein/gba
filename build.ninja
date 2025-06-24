@@ -1,15 +1,16 @@
+brewpaths = /opt/homebrew/opt/lld/bin:/opt/homebrew/opt/llvm/bin
 cflags = -target armv4t-none-eabi -march=armv4t -nostdlib -ffreestanding -Wall -O2
 # Use LLD directly when linking so that Apple's clang can be used on macOS.
 ldflags = -T linker.ld -m armelf
 
 rule cc
-  command = clang $cflags -c $in -o $out
+  command = PATH=$brewpaths:$$PATH clang $cflags -c $in -o $out
 
 rule link
-  command = ld.lld $ldflags $in -o $out
+  command = PATH=$brewpaths:$$PATH ld.lld $ldflags $in -o $out
 
 rule objcopy
-  command = llvm-objcopy-19 -O binary $in $out
+  command = PATH=$brewpaths:$$PATH ./objcopy.sh -O binary $in $out
 
 build build/crt0.o: cc src/crt0.s
 build build/main.o: cc src/main.c
