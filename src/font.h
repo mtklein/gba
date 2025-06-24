@@ -1,5 +1,4 @@
-#ifndef FONT_H
-#define FONT_H
+#pragma once
 #include <stdint.h>
 
 static const uint8_t font_space[8] = {
@@ -47,5 +46,3 @@ static inline const uint8_t* font_get(char c) {
         default:  return font_space;
     }
 }
-
-#endif // FONT_H

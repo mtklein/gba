@@ -11,13 +11,9 @@ rule compile
   command = PATH=$path clang $arch -c $in -o $out -O1 -Werror $warn -fcolor-diagnostics
 
 rule link
-  command = PATH=$path ld.lld -T linker.ld -m armelf $in -o $out
+  command = PATH=$path ld.lld -T src/linker.ld -m armelf $in -o $out --oformat=binary
 
-rule binary
-  command = PATH=$path ld.lld -T linker.ld -m armelf $in --oformat=binary -o $out
-
-build out/main.o:    compile  src/main.c
-build out/crt0.o:    assemble src/crt0.s
 build out/gba_header.o: assemble src/gba_header.s
-build out/hello.elf: link     out/gba_header.o out/main.o out/crt0.o
-build hello.gba:     binary   out/gba_header.o out/main.o out/crt0.o
+build out/crt0.o:       assemble src/crt0.s
+build out/main.o:       compile  src/main.c
+build hello.gba:        link     out/gba_header.o out/crt0.o out/main.o
