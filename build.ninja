@@ -13,11 +13,11 @@ rule compile
 rule link
   command = PATH=$path ld.lld -T linker.ld -m armelf $in -o $out
 
-rule objcopy
-  command = PATH=$path llvm-objcopy -O binary $in $out
+rule binary
+  command = PATH=$path ld.lld -T linker.ld -m armelf $in --oformat=binary -o $out
 
 build out/main.o:    compile  src/main.c
 build out/crt0.o:    assemble src/crt0.s
 build out/gba_header.o: assemble src/gba_header.s
 build out/hello.elf: link     out/gba_header.o out/main.o out/crt0.o
-build hello.gba:     objcopy  out/hello.elf
+build hello.gba:     binary   out/gba_header.o out/main.o out/crt0.o
