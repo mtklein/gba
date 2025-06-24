@@ -3,8 +3,9 @@
 #include "font.h"
 
 #define REG_DISPCNT (*(volatile uint16_t*)0x4000000)
-#define MODE3 3
+#define MODE4 4
 #define BG2_ENABLE (1<<10)
+#define PALETTE ((volatile uint16_t*)0x5000000)
 
 #define REG_VCOUNT (*(volatile uint16_t*)0x4000006)
 #define REG_KEYINPUT (*(volatile uint16_t*)0x4000130)
@@ -19,17 +20,22 @@
 #define SCREEN_WIDTH 240
 #define SCREEN_HEIGHT 160
 
+#define COLOR_BLACK 0
+#define COLOR_WHITE 1
+#define COLOR_LEFT  2
+#define COLOR_RIGHT 3
+
 #define FRONT_BUFFER ((volatile uint16_t*)0x6000000)
 #define BACK_BUFFER  ((volatile uint16_t*)0x600A000)
 
 static volatile uint16_t* videoBuffer = BACK_BUFFER;
 static inline void flipPage(void) {
-    if(videoBuffer == FRONT_BUFFER) {
-        videoBuffer = BACK_BUFFER;
-        REG_DISPCNT |= (1<<4);
-    } else {
-        videoBuffer = FRONT_BUFFER;
+    if(REG_DISPCNT & (1<<4)) {
         REG_DISPCNT &= ~(1<<4);
+        videoBuffer = BACK_BUFFER;
+    } else {
+        REG_DISPCNT |= (1<<4);
+        videoBuffer = FRONT_BUFFER;
     }
 }
 
@@ -42,23 +48,36 @@ static inline uint16_t keysCurrent(void) {
     return ~REG_KEYINPUT & 0x03FF;
 }
 
-static inline void drawPixel(int x, int y, uint16_t color) {
+static inline void drawPixel(int x, int y, uint8_t color) {
+    uint32_t idx;
+    uint16_t cur;
     if(x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT) return;
-    videoBuffer[y * SCREEN_WIDTH + x] = color;
+    idx = (uint32_t)y * (SCREEN_WIDTH/2u) + (uint32_t)(x >> 1);
+    cur = videoBuffer[idx];
+    if(x & 1) {
+        uint16_t mask = (uint16_t)((uint16_t)color << 8);
+        cur = (uint16_t)((cur & 0x00FFu) | mask);
+    } else {
+        uint16_t mask = (uint16_t)color;
+        cur = (uint16_t)((cur & 0xFF00u) | mask);
+    }
+    videoBuffer[idx] = cur;
 }
 
-static void fillRect(int x, int y, int w, int h, uint16_t color) {
+static void fillRect(int x, int y, int w, int h, uint8_t color) {
     for(int r=0;r<h;r++)
         for(int c=0;c<w;c++)
             drawPixel(x+c, y+r, color);
 }
 
-static void clearScreen(uint16_t color) {
-    for(int i=0;i<SCREEN_WIDTH*SCREEN_HEIGHT;i++)
-        videoBuffer[i] = color;
+static void clearScreen(uint8_t color) {
+    uint16_t fill = (uint16_t)((uint16_t)color | ((uint16_t)color << 8));
+    for(int i=0;i<SCREEN_WIDTH*SCREEN_HEIGHT/2;i++) {
+        videoBuffer[i] = fill;
+    }
 }
 
-static void drawChar(int x, int y, char ch, uint16_t color) {
+static void drawChar(int x, int y, char ch, uint8_t color) {
     const uint8_t* glyph = font_get(ch);
     for(int row = 0; row < 8; ++row) {
         uint8_t bits = glyph[row];
@@ -69,14 +88,14 @@ static void drawChar(int x, int y, char ch, uint16_t color) {
     }
 }
 
-static void drawString(int x, int y, const char* str, uint16_t color) {
+static void drawString(int x, int y, const char* str, uint8_t color) {
     while(*str) {
         drawChar(x, y, *str++, color);
         x += 8;
     }
 }
 
-static void drawNumber(int x, int y, int val, uint16_t color) {
+static void drawNumber(int x, int y, int val, uint8_t color) {
     char tens = (char)('0' + (val/10)%10);
     char ones = (char)('0' + (val%10));
     if(val >= 10) {
@@ -117,8 +136,8 @@ static uint32_t rand32(void) {
 }
 
 typedef struct {
-    int x,y;    // fixed 8.8
-    int vx,vy;
+    int x, y;   // fixed 8.8
+    int vx, vy;
     int life;
     int color;
 } Particle;
@@ -130,7 +149,7 @@ static const int8_t dirs[8][2] = {
     {-2,-2},{-2,0},{-2,2},{0,-2},{0,2},{2,-2},{2,0},{2,2}
 };
 
-static void spawnFirework(uint16_t color) {
+static void spawnFirework(int color) {
     int baseX = rand32()%SCREEN_WIDTH;
     int baseY = rand32()%SCREEN_HEIGHT;
     for(int d=0; d<8; d++) {
@@ -157,7 +176,7 @@ static void updateParticles(void) {
 
 static void drawParticles(void) {
     for(int i=0;i<MAX_PARTICLES;i++) if(particles[i].life>0) {
-        drawPixel(particles[i].x>>8, particles[i].y>>8, (uint16_t)particles[i].color);
+        drawPixel(particles[i].x>>8, particles[i].y>>8, (uint8_t)particles[i].color);
     }
 }
 
@@ -174,7 +193,9 @@ int main(void) {
     uint16_t oldKeys = 0;
     int fireworkTimer = 0;
 
-    REG_DISPCNT = MODE3 | BG2_ENABLE;
+    REG_DISPCNT = MODE4 | BG2_ENABLE;
+    PALETTE[COLOR_BLACK] = RGB15(0,0,0);
+    PALETTE[COLOR_WHITE] = RGB15(31,31,31);
 
     left.y = (SCREEN_HEIGHT - PADDLE_HEIGHT)/2;
     right.y = (SCREEN_HEIGHT - PADDLE_HEIGHT)/2;
@@ -184,6 +205,8 @@ int main(void) {
     ball.vy = 0;
     leftColor = warmColors[warmIdx];
     rightColor = coolColors[coolIdx];
+    PALETTE[COLOR_LEFT] = leftColor;
+    PALETTE[COLOR_RIGHT] = rightColor;
 
     while(1) {
         uint16_t keys;
@@ -202,8 +225,8 @@ int main(void) {
             if(keys & KEY_A)    { if(right.y>0) right.y -= PADDLE_SPEED; }
             if(keys & KEY_B)    { if(right.y<SCREEN_HEIGHT-PADDLE_HEIGHT) right.y += PADDLE_SPEED; }
 
-            if(pressed & KEY_SELECT) { warmIdx = (warmIdx+1)%NUM_WARM; leftColor = warmColors[warmIdx]; }
-            if(pressed & KEY_START)  { coolIdx = (coolIdx+1)%NUM_COOL; rightColor = coolColors[coolIdx]; }
+            if(pressed & KEY_SELECT) { warmIdx = (warmIdx+1)%NUM_WARM; leftColor = warmColors[warmIdx]; PALETTE[COLOR_LEFT] = leftColor; }
+            if(pressed & KEY_START)  { coolIdx = (coolIdx+1)%NUM_COOL; rightColor = coolColors[coolIdx]; PALETTE[COLOR_RIGHT] = rightColor; }
 
             ball.x += ball.vx;
             ball.y += ball.vy;
@@ -247,22 +270,22 @@ int main(void) {
         } else {
             fireworkTimer++;
             if(fireworkTimer>30) {
-                spawnFirework(winner==1?leftColor:rightColor);
+                spawnFirework(winner==1?COLOR_LEFT:COLOR_RIGHT);
                 fireworkTimer=0;
             }
             updateParticles();
         }
-        clearScreen(RGB15(0,0,0));
-        fillRect(leftX, left.y, PADDLE_WIDTH, PADDLE_HEIGHT, leftColor);
-        fillRect(rightX, right.y, PADDLE_WIDTH, PADDLE_HEIGHT, rightColor);
-        drawNumber(30,10,score1,leftColor);
-        drawNumber(SCREEN_WIDTH-30-8*(score2>=10?2:1),10,score2,rightColor);
-        fillRect(ball.x>>8, ball.y>>8, BALL_SIZE, BALL_SIZE, RGB15(31,31,31));
+        clearScreen(COLOR_BLACK);
+        fillRect(leftX, left.y, PADDLE_WIDTH, PADDLE_HEIGHT, COLOR_LEFT);
+        fillRect(rightX, right.y, PADDLE_WIDTH, PADDLE_HEIGHT, COLOR_RIGHT);
+        drawNumber(30,10,score1,COLOR_LEFT);
+        drawNumber(SCREEN_WIDTH-30-8*(score2>=10?2:1),10,score2,COLOR_RIGHT);
+        fillRect(ball.x>>8, ball.y>>8, BALL_SIZE, BALL_SIZE, COLOR_WHITE);
         drawParticles();
         if(gameOver) {
             const char* msg = winner==1?"P1 WINS!":"P2 WINS!";
             int msgWidth = 8*7; // 7 chars
-            drawString((SCREEN_WIDTH-msgWidth)/2, SCREEN_HEIGHT/2-4, msg, winner==1?leftColor:rightColor);
+            drawString((SCREEN_WIDTH-msgWidth)/2, SCREEN_HEIGHT/2-4, msg, winner==1?COLOR_LEFT:COLOR_RIGHT);
         }
 
         waitForVBlank();
