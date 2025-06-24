@@ -214,6 +214,11 @@ int main(void) {
         int leftX = 10;
         int rightX = SCREEN_WIDTH-10-PADDLE_WIDTH;
 
+        waitForVBlank();
+        PALETTE[COLOR_LEFT] = leftColor;
+        PALETTE[COLOR_RIGHT] = rightColor;
+        flipPage();
+
         keys = keysCurrent();
         pressed = (keys ^ oldKeys) & keys;
         oldKeys = keys;
@@ -225,8 +230,8 @@ int main(void) {
             if(keys & KEY_A)    { if(right.y>0) right.y -= PADDLE_SPEED; }
             if(keys & KEY_B)    { if(right.y<SCREEN_HEIGHT-PADDLE_HEIGHT) right.y += PADDLE_SPEED; }
 
-            if(pressed & KEY_SELECT) { warmIdx = (warmIdx+1)%NUM_WARM; leftColor = warmColors[warmIdx]; PALETTE[COLOR_LEFT] = leftColor; }
-            if(pressed & KEY_START)  { coolIdx = (coolIdx+1)%NUM_COOL; rightColor = coolColors[coolIdx]; PALETTE[COLOR_RIGHT] = rightColor; }
+            if(pressed & KEY_SELECT) { warmIdx = (warmIdx+1)%NUM_WARM; leftColor = warmColors[warmIdx]; }
+            if(pressed & KEY_START)  { coolIdx = (coolIdx+1)%NUM_COOL; rightColor = coolColors[coolIdx]; }
 
             ball.x += ball.vx;
             ball.y += ball.vy;
@@ -288,7 +293,5 @@ int main(void) {
             drawString((SCREEN_WIDTH-msgWidth)/2, SCREEN_HEIGHT/2-4, msg, winner==1?COLOR_LEFT:COLOR_RIGHT);
         }
 
-        waitForVBlank();
-        flipPage();
     }
 }
