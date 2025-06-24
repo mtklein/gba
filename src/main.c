@@ -134,9 +134,9 @@ static int const NUM_WARM = sizeof(warm)/sizeof(warm[0]);
 void main(void) {
     *reg_dispcnt = 4 | (1<<10);
 
-    enum {BG,WHITE,LEFT,RIGHT};
-    palette[BG   ] = ((union rgb555){.r=31,.g=31,.b=31}).rgbx;
-    palette[WHITE] = ((union rgb555){.r=31,.g=31,.b=31}).rgbx;
+    enum {BG,BALL,LEFT,RIGHT};
+    palette[BG  ] = ((union rgb555){.r=31,.g=31,.b=31}).rgbx;
+    palette[BALL] = ((union rgb555){.r=0, .g=0, .b=0 }).rgbx;
     palette[LEFT ] = warm[0].rgbx;
     palette[RIGHT] = cool[0].rgbx;
 
@@ -230,7 +230,7 @@ void main(void) {
         int right_x = W-10-paddle_w;
         fill_rect(fb, left_x,  left.y, paddle_w, paddle_h, LEFT);
         fill_rect(fb, right_x, right.y, paddle_w, paddle_h, RIGHT);
-        fill_rect(fb, ball.x>>8, ball.y>>8, ball_size, ball_size, WHITE);
+        fill_rect(fb, ball.x>>8, ball.y>>8, ball_size, ball_size, BALL);
         draw_num(fb, 30,10, score1, LEFT);
         draw_num(fb, W-30-8*(score2>=10?2:1),10, score2, RIGHT);
         if (game_over) {
