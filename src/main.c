@@ -197,6 +197,11 @@ int main(void) {
     PALETTE[COLOR_BLACK] = RGB15(0,0,0);
     PALETTE[COLOR_WHITE] = RGB15(31,31,31);
 
+    videoBuffer = FRONT_BUFFER;
+    clearScreen(COLOR_BLACK);
+    videoBuffer = BACK_BUFFER;
+    clearScreen(COLOR_BLACK);
+
     left.y = (SCREEN_HEIGHT - PADDLE_HEIGHT)/2;
     right.y = (SCREEN_HEIGHT - PADDLE_HEIGHT)/2;
     ball.x = (SCREEN_WIDTH/2)<<8;
@@ -213,11 +218,6 @@ int main(void) {
         uint16_t pressed;
         int leftX = 10;
         int rightX = SCREEN_WIDTH-10-PADDLE_WIDTH;
-
-        waitForVBlank();
-        PALETTE[COLOR_LEFT] = leftColor;
-        PALETTE[COLOR_RIGHT] = rightColor;
-        flipPage();
 
         keys = keysCurrent();
         pressed = (keys ^ oldKeys) & keys;
@@ -292,6 +292,11 @@ int main(void) {
             int msgWidth = 8*7; // 7 chars
             drawString((SCREEN_WIDTH-msgWidth)/2, SCREEN_HEIGHT/2-4, msg, winner==1?COLOR_LEFT:COLOR_RIGHT);
         }
+
+        waitForVBlank();
+        PALETTE[COLOR_LEFT] = leftColor;
+        PALETTE[COLOR_RIGHT] = rightColor;
+        flipPage();
 
     }
 }
