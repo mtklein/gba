@@ -7,6 +7,12 @@
 #define BG2_ENABLE (1<<10)
 #define PALETTE ((volatile uint16_t*)0x5000000)
 
+#define REG_DISPSTAT (*(volatile uint16_t*)0x4000004)
+#define REG_IE       (*(volatile uint16_t*)0x4000200)
+#define REG_IF       (*(volatile uint16_t*)0x4000202)
+#define REG_IME      (*(volatile uint16_t*)0x4000208)
+#define INTR_CHECK   (*(volatile uint16_t*)0x03007FF8)
+
 #define REG_KEYINPUT (*(volatile uint16_t*)0x4000130)
 
 #define KEY_A      (1<<0)
@@ -38,8 +44,17 @@ static inline void flipPage(void) {
     }
 }
 
+static void enableVBlankIrq(void) {
+    REG_DISPSTAT |= (1<<3);
+    REG_IE = 1;
+    REG_IF = 1;
+    REG_IME = 1;
+}
+
 static inline void waitForVBlank(void) {
     __asm__ volatile("swi 0x05" ::: "r0", "r1", "r2", "r3", "r12", "lr", "memory");
+    INTR_CHECK = 0;
+    REG_IF = 1;
 }
 
 static inline uint16_t keysCurrent(void) {
@@ -199,6 +214,8 @@ int main(void) {
     clearScreen(COLOR_BLACK);
     videoBuffer = BACK_BUFFER;
     clearScreen(COLOR_BLACK);
+
+    enableVBlankIrq();
 
     left.y = (SCREEN_HEIGHT - PADDLE_HEIGHT)/2;
     right.y = (SCREEN_HEIGHT - PADDLE_HEIGHT)/2;
