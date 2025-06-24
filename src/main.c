@@ -2,10 +2,22 @@
 #include <stdbool.h>
 #include "font.h"
 
+typedef struct {
+    uint16_t attr0;
+    uint16_t attr1;
+    uint16_t attr2;
+    uint16_t pad;
+} ObjAttr;
+
 #define REG_DISPCNT (*(volatile uint16_t*)0x4000000)
 #define MODE4 4
 #define BG2_ENABLE (1<<10)
+#define OBJ_ENABLE (1<<12)
+#define OBJ_MAP_1D (1<<6)
 #define PALETTE ((volatile uint16_t*)0x5000000)
+#define OBJ_PALETTE ((volatile uint16_t*)0x5000200)
+#define OAM ((volatile ObjAttr*)0x7000000)
+#define SPRITE_GFX ((volatile uint32_t*)0x6010000)
 
 #define REG_VCOUNT (*(volatile uint16_t*)0x4000006)
 #define REG_KEYINPUT (*(volatile uint16_t*)0x4000130)
@@ -24,6 +36,61 @@
 #define COLOR_WHITE 1
 #define COLOR_LEFT  2
 #define COLOR_RIGHT 3
+
+#define TILE_PADDLE_L 0
+#define TILE_PADDLE_R 4
+#define TILE_BALL     8
+
+/* Sprite attribute helpers */
+#define ATTR0_REG     (0<<8)
+#define ATTR0_HIDE    (2<<8)
+#define ATTR0_4BPP    0
+#define ATTR0_SQUARE  0
+#define ATTR0_TALL    0x8000
+
+#define ATTR1_SIZE_8  0
+#define ATTR1_SIZE_8x32 0x4000
+
+static inline void obj_set_attr(volatile ObjAttr* obj, uint16_t a0, uint16_t a1, uint16_t a2) {
+    obj->attr0 = a0;
+    obj->attr1 = a1;
+    obj->attr2 = a2;
+}
+
+static inline void obj_set_pos(volatile ObjAttr* obj, int x, int y) {
+    obj->attr0 = (obj->attr0 & ~0x00FF) | (y & 0x00FF);
+    obj->attr1 = (obj->attr1 & ~0x01FF) | (x & 0x01FF);
+}
+
+static void loadSolidTile(int tileIndex, uint8_t color) {
+    volatile uint32_t* tile = &SPRITE_GFX[tileIndex * 8];
+    uint32_t c = (uint32_t)(color & 0xF);
+    uint32_t packed = c | (c<<4) | (c<<8) | (c<<12) |
+                      (c<<16) | (c<<20) | (c<<24) | (c<<28);
+    for(int i=0;i<8;i++) tile[i] = packed;
+}
+
+static void initSprites(void) {
+    /* load paddle tiles */
+    for(int i=0;i<4;i++) loadSolidTile(TILE_PADDLE_L+i, COLOR_LEFT);
+    for(int i=0;i<4;i++) loadSolidTile(TILE_PADDLE_R+i, COLOR_RIGHT);
+    loadSolidTile(TILE_BALL, COLOR_WHITE);
+
+    /* set initial attributes */
+    obj_set_attr(&OAM[0], ATTR0_REG | ATTR0_TALL | ATTR0_4BPP, ATTR1_SIZE_8x32, TILE_PADDLE_L);
+    obj_set_attr(&OAM[1], ATTR0_REG | ATTR0_TALL | ATTR0_4BPP, ATTR1_SIZE_8x32, TILE_PADDLE_R);
+    obj_set_attr(&OAM[2], ATTR0_REG | ATTR0_SQUARE | ATTR0_4BPP, ATTR1_SIZE_8, TILE_BALL);
+    for(int i=3;i<128;i++) obj_set_attr(&OAM[i], ATTR0_HIDE, 0, 0);
+}
+
+static void updateSpritePositions(int leftX, int leftY, int rightX, int rightY, int ballX, int ballY) {
+    obj_set_pos(&OAM[0], leftX, leftY);
+    obj_set_pos(&OAM[1], rightX, rightY);
+    obj_set_pos(&OAM[2], ballX, ballY);
+}
+
+
+
 
 #define FRONT_BUFFER ((volatile uint16_t*)0x6000000)
 #define BACK_BUFFER  ((volatile uint16_t*)0x600A000)
@@ -62,12 +129,6 @@ static inline void drawPixel(int x, int y, uint8_t color) {
         cur = (uint16_t)((cur & 0xFF00u) | mask);
     }
     videoBuffer[idx] = cur;
-}
-
-static void fillRect(int x, int y, int w, int h, uint8_t color) {
-    for(int r=0;r<h;r++)
-        for(int c=0;c<w;c++)
-            drawPixel(x+c, y+r, color);
 }
 
 static void clearScreen(uint8_t color) {
@@ -193,14 +254,17 @@ int main(void) {
     uint16_t oldKeys = 0;
     int fireworkTimer = 0;
 
-    REG_DISPCNT = MODE4 | BG2_ENABLE;
+    REG_DISPCNT = MODE4 | BG2_ENABLE | OBJ_ENABLE | OBJ_MAP_1D;
     PALETTE[COLOR_BLACK] = RGB15(0,0,0);
     PALETTE[COLOR_WHITE] = RGB15(31,31,31);
+    OBJ_PALETTE[COLOR_BLACK] = RGB15(0,0,0);
+    OBJ_PALETTE[COLOR_WHITE] = RGB15(31,31,31);
 
     videoBuffer = FRONT_BUFFER;
     clearScreen(COLOR_BLACK);
     videoBuffer = BACK_BUFFER;
     clearScreen(COLOR_BLACK);
+    initSprites();
 
     left.y = (SCREEN_HEIGHT - PADDLE_HEIGHT)/2;
     right.y = (SCREEN_HEIGHT - PADDLE_HEIGHT)/2;
@@ -212,6 +276,8 @@ int main(void) {
     rightColor = coolColors[coolIdx];
     PALETTE[COLOR_LEFT] = leftColor;
     PALETTE[COLOR_RIGHT] = rightColor;
+    OBJ_PALETTE[COLOR_LEFT] = leftColor;
+    OBJ_PALETTE[COLOR_RIGHT] = rightColor;
 
     while(1) {
         uint16_t keys;
@@ -283,14 +349,14 @@ int main(void) {
         waitForVBlank();
         PALETTE[COLOR_LEFT] = leftColor;
         PALETTE[COLOR_RIGHT] = rightColor;
+        OBJ_PALETTE[COLOR_LEFT] = leftColor;
+        OBJ_PALETTE[COLOR_RIGHT] = rightColor;
+        updateSpritePositions(leftX, left.y, rightX, right.y, ball.x>>8, ball.y>>8);
         flipPage();
 
         clearScreen(COLOR_BLACK);
-        fillRect(leftX, left.y, PADDLE_WIDTH, PADDLE_HEIGHT, COLOR_LEFT);
-        fillRect(rightX, right.y, PADDLE_WIDTH, PADDLE_HEIGHT, COLOR_RIGHT);
         drawNumber(30,10,score1,COLOR_LEFT);
         drawNumber(SCREEN_WIDTH-30-8*(score2>=10?2:1),10,score2,COLOR_RIGHT);
-        fillRect(ball.x>>8, ball.y>>8, BALL_SIZE, BALL_SIZE, COLOR_WHITE);
         drawParticles();
         if(gameOver) {
             const char* msg = winner==1?"P1 WINS!":"P2 WINS!";
