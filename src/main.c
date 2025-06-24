@@ -264,7 +264,6 @@ int main(void) {
     clearScreen(COLOR_BLACK);
     videoBuffer = BACK_BUFFER;
     clearScreen(COLOR_BLACK);
-    initSprites();
 
     left.y = (SCREEN_HEIGHT - PADDLE_HEIGHT)/2;
     right.y = (SCREEN_HEIGHT - PADDLE_HEIGHT)/2;
@@ -278,6 +277,10 @@ int main(void) {
     PALETTE[COLOR_RIGHT] = rightColor;
     OBJ_PALETTE[COLOR_LEFT] = leftColor;
     OBJ_PALETTE[COLOR_RIGHT] = rightColor;
+
+    initSprites();
+    updateSpritePositions(10, left.y, SCREEN_WIDTH-10-PADDLE_WIDTH, right.y,
+                          ball.x>>8, ball.y>>8);
 
     while(1) {
         uint16_t keys;
