@@ -18,5 +18,6 @@ rule objcopy
 
 build out/main.o:    compile  src/main.c
 build out/crt0.o:    assemble src/crt0.s
-build out/hello.elf: link     out/main.o out/crt0.o
+build out/gba_header.o: assemble src/gba_header.s
+build out/hello.elf: link     out/gba_header.o out/main.o out/crt0.o
 build hello.gba:     objcopy  out/hello.elf

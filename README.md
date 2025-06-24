@@ -1,6 +1,8 @@
 # GBA Hello World
 
 This repository builds a minimal Game Boy Advance ROM using C and Ninja.
+The project now includes a proper GBA header so the resulting binary works on
+real hardware and most emulators.
 
 ## Building
 
