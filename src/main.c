@@ -84,16 +84,15 @@ int main(void) {
     clear(front, BG);
     clear( back, BG);
 
-    int const size = 6, speed = 512;
+    int const size = 6,
+             speed = 512;
 
     struct ball ball = {
         .x = (W/2 - size/2) << 8, .vx = speed,
         .y = (H/2 - size/2) << 8, .vy = speed,
     };
 
-    while (1) {
-        fb = swap_buffers(front, back);
-
+    for (;; fb = swap_buffers(front, back)) {
         ball.x += ball.vx;
         ball.y += ball.vy;
 
