@@ -80,6 +80,7 @@ static void drawNumber(int x, int y, int val, uint16_t color) {
 #define PADDLE_WIDTH 4
 #define BALL_SIZE 4
 #define PADDLE_SPEED 2
+#define BALL_SPEED 512
 
 typedef struct { int y; } Paddle;
 
@@ -167,7 +168,7 @@ int main(void) {
     right.y = (SCREEN_HEIGHT - PADDLE_HEIGHT)/2;
     ball.x = (SCREEN_WIDTH/2)<<8;
     ball.y = (SCREEN_HEIGHT/2)<<8;
-    ball.vx = -256;
+    ball.vx = -BALL_SPEED;
     ball.vy = 0;
     leftColor = warmColors[warmIdx];
     rightColor = coolColors[coolIdx];
@@ -178,7 +179,6 @@ int main(void) {
         int leftX = 10;
         int rightX = SCREEN_WIDTH-10-PADDLE_WIDTH;
 
-        waitForVBlank();
         keys = keysCurrent();
         pressed = (keys ^ oldKeys) & keys;
         oldKeys = keys;
@@ -206,25 +206,25 @@ int main(void) {
                by + BALL_SIZE >= left.y && by <= left.y + PADDLE_HEIGHT) {
                 int offset;
                 ball.x = (leftX + PADDLE_WIDTH)<<8;
-                ball.vx = 256;
+                ball.vx = BALL_SPEED;
                 offset = (by + BALL_SIZE/2) - (left.y + PADDLE_HEIGHT/2);
-                ball.vy += offset*16;
+                ball.vy = offset*32;
             }
             if(bx + BALL_SIZE >= rightX &&
                bx <= rightX + PADDLE_WIDTH &&
                by + BALL_SIZE >= right.y && by <= right.y + PADDLE_HEIGHT) {
                 int offset;
                 ball.x = (rightX - BALL_SIZE)<<8;
-                ball.vx = -256;
+                ball.vx = -BALL_SPEED;
                 offset = (by + BALL_SIZE/2) - (right.y + PADDLE_HEIGHT/2);
-                ball.vy += offset*16;
+                ball.vy = offset*32;
             }
 
             if(bx < 0) {
-                score2++; ball.x = (SCREEN_WIDTH/2)<<8; ball.y = (SCREEN_HEIGHT/2)<<8; ball.vx = 256; ball.vy = 0;
+                score2++; ball.x = (SCREEN_WIDTH/2)<<8; ball.y = (SCREEN_HEIGHT/2)<<8; ball.vx = BALL_SPEED; ball.vy = 0;
                 left.y = right.y = (SCREEN_HEIGHT - PADDLE_HEIGHT)/2;
             } else if(bx > SCREEN_WIDTH-BALL_SIZE) {
-                score1++; ball.x = (SCREEN_WIDTH/2)<<8; ball.y = (SCREEN_HEIGHT/2)<<8; ball.vx = -256; ball.vy = 0;
+                score1++; ball.x = (SCREEN_WIDTH/2)<<8; ball.y = (SCREEN_HEIGHT/2)<<8; ball.vx = -BALL_SPEED; ball.vy = 0;
                 left.y = right.y = (SCREEN_HEIGHT - PADDLE_HEIGHT)/2;
             }
 
@@ -241,6 +241,7 @@ int main(void) {
             updateParticles();
         }
 
+        waitForVBlank();
         clearScreen(RGB15(0,0,0));
         fillRect(leftX, left.y, PADDLE_WIDTH, PADDLE_HEIGHT, leftColor);
         fillRect(rightX, right.y, PADDLE_WIDTH, PADDLE_HEIGHT, rightColor);
