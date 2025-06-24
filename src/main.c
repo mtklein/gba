@@ -280,6 +280,11 @@ int main(void) {
             }
             updateParticles();
         }
+        waitForVBlank();
+        PALETTE[COLOR_LEFT] = leftColor;
+        PALETTE[COLOR_RIGHT] = rightColor;
+        flipPage();
+
         clearScreen(COLOR_BLACK);
         fillRect(leftX, left.y, PADDLE_WIDTH, PADDLE_HEIGHT, COLOR_LEFT);
         fillRect(rightX, right.y, PADDLE_WIDTH, PADDLE_HEIGHT, COLOR_RIGHT);
@@ -292,11 +297,6 @@ int main(void) {
             int msgWidth = 8*7; // 7 chars
             drawString((SCREEN_WIDTH-msgWidth)/2, SCREEN_HEIGHT/2-4, msg, winner==1?COLOR_LEFT:COLOR_RIGHT);
         }
-
-        waitForVBlank();
-        PALETTE[COLOR_LEFT] = leftColor;
-        PALETTE[COLOR_RIGHT] = rightColor;
-        flipPage();
 
     }
 }
