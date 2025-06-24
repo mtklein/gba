@@ -1,0 +1,19 @@
+cflags = -target armv4t-none-eabi -march=armv4t -nostdlib -ffreestanding -Wall -O2
+ldflags = -fuse-ld=lld -T linker.ld
+
+rule cc
+  command = clang $cflags -c $in -o $out
+
+rule link
+  command = clang $cflags $in -o $out $ldflags
+
+rule objcopy
+  command = llvm-objcopy-19 -O binary $in $out
+
+build build/crt0.o: cc src/crt0.s
+build build/main.o: cc src/main.c
+
+build build/hello.elf: link build/crt0.o build/main.o
+build hello.gba: objcopy build/hello.elf
+
+default hello.gba
