@@ -8,6 +8,13 @@
 #define W 240
 #define H 160
 
+struct DMA {
+    void const *src;
+    void       *dst;
+    uint32_t    cnt;
+};
+static struct DMA volatile *dma = (struct DMA volatile*)0x040000B0;
+
 static uint16_t* swap_buffers(uint16_t *front, uint16_t *back) {
     while (REG_VCOUNT >= H);
     while (REG_VCOUNT <  H);
@@ -58,10 +65,10 @@ static void fill_rect(uint16_t *fb,
 }
 
 static void clear(uint16_t *fb, uint8_t color) {
-    union mode4_pair const fill = {.lo=color, .hi=color};
-    for(int i = 0; i < W*H/2; i++) {
-        fb[i] = fill.both;
-    }
+    union mode4_pair const src = {.lo=color, .hi=color};
+    dma[3].src = &src;
+    dma[3].dst = fb;
+    dma[3].cnt = (W*H/2) | (2<<23) | (1u<<31);
 }
 
 struct ball {
