@@ -7,6 +7,9 @@ SECTIONS {
     .text : {
         *(.text*)
     }
+    .ARM.exidx : {
+        *(.ARM.exidx*)
+    }
     .rodata : {
         *(.rodata*)
     }
