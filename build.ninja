@@ -1,17 +1,19 @@
 builddir = out
 
+cc   = clang
+ld   = ld.lld
 path = /opt/homebrew/opt/lld/bin:/opt/homebrew/opt/llvm/bin:$$PATH
 arch = -target armv4t-none-eabi -march=armv4t
-warn = -Weverything -Wno-unsafe-buffer-usage
+warn = -Weverything -Wno-declaration-after-statement -Wno-unsafe-buffer-usage
 
 rule assemble
-  command = PATH=$path clang $arch -c $in -o $out
+  command = PATH=$path $cc $arch -c $in -o $out
 
 rule compile
-  command = PATH=$path clang $arch -c $in -o $out -O1 -Werror $warn -fcolor-diagnostics
+  command = PATH=$path $cc $arch -c $in -o $out -O1 -ffreestanding -Werror $warn -fcolor-diagnostics
 
 rule link
-  command = PATH=$path ld.lld -T src/linker.ld -m armelf $in -o $out --oformat=binary
+  command = PATH=$path $ld -T src/linker.ld -m armelf $in -o $out --oformat=binary
 
 build out/gba_header.o: assemble src/gba_header.s
 build out/crt0.o:       assemble src/crt0.s
