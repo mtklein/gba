@@ -1,4 +1,5 @@
 #include <stdint.h>
+#define assert(cond) if (!(cond)) __builtin_trap()
 
 #define REG_DISPCNT (*(uint16_t volatile*)0x4000000)
 #define REG_VCOUNT  (*(uint16_t volatile*)0x4000006)
@@ -7,6 +8,7 @@
 
 #define W 240
 #define H 160
+
 
 struct DMA {
     void const *src;
@@ -66,9 +68,11 @@ static void fill_rect(uint16_t *fb,
 
 static void clear(uint16_t *fb, uint8_t color) {
     union mode4_pair const src = {.lo=color, .hi=color};
+    assert(!(dma[3].cnt & (1u<<31)));
     dma[3].src = &src;
     dma[3].dst = fb;
     dma[3].cnt = (W*H/2) | (2<<23) | (1u<<31);
+    assert(!(dma[3].cnt & (1u<<31)));
 }
 
 struct ball {
