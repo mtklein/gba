@@ -93,13 +93,13 @@ static void draw_str(uint16_t *fb, int x, int y, char const *s, uint8_t color) {
     }
 }
 
-__attribute__((optnone))
+
 static void draw_num(uint16_t *fb, int x, int y, int v, uint8_t color) {
-    int tens = 0;
-    while (v >= 10) { v -= 10; tens++; }
-    if (tens) {
+    if (v >= 10) {
+        int const tens = (v * 103) >> 10;
         draw_char(fb, x, y, (char)('0' + tens), color);
         x += 8;
+        v -= 10*tens;
     }
     draw_char(fb, x, y, (char)('0' + v), color);
 }

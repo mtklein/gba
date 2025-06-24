@@ -10,7 +10,7 @@ rule assemble
   command = PATH=$path $cc $arch -c $in -o $out
 
 rule compile
-  command = PATH=$path $cc $arch -c $in -o $out -O2 -ffreestanding -Werror $warn -fcolor-diagnostics
+  command = PATH=$path $cc $arch -c $in -o $out -Os -ffreestanding -Werror $warn -fcolor-diagnostics
 
 rule link
   command = PATH=$path $ld -T src/linker.ld -m armelf $in -o $out --oformat=binary
