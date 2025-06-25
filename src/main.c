@@ -324,17 +324,16 @@ void main(void) {
         left.draw(&left, fb, winner);
         right.draw(&right, fb, winner);
         ball.draw(&ball, fb, winner);
-        draw_num(fb,                      30,10, score1,  left.color);
-        draw_num(fb, W-30-8*(score2>=10?2:1),10, score2, right.color);
-
         for (int i = 0; i < len(particle); i++) {
             struct particle const *p = particle+i;
             p->draw(p, fb, winner);
         }
+
+        draw_num(fb,                      30,10, score1,  left.color);
+        draw_num(fb, W-30-8*(score2>=10?2:1),10, score2, right.color);
         if (winner) {
             char const *msg = winner==1 ? "P1 WINS!" : "P2 WINS!";
-            draw_str(fb, (W-8*7)/2, H/2-4, msg,
-                     (winner==1 ? left.color : right.color));
+            draw_str(fb, (W-8*7)/2, H/2-4, msg, (winner==1 ? left.color : right.color));
         }
     }
 }
