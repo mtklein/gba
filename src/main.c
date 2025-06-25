@@ -104,9 +104,16 @@ static _Accum const paddle_h     = 30,
                     ball_size    = 4,
                     ball_speed   = 1.5K;
 
-struct paddle   { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3]; };
-struct ball     { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3]; };
-struct particle { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3]; };
+struct fb;
+
+typedef void draw_fn(void const *self, struct fb *fb, int winner);
+
+struct paddle   { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3];
+                   draw_fn *draw; };
+struct ball     { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3];
+                   draw_fn *draw; };
+struct particle { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3];
+                   draw_fn *draw; };
 
 static struct rgb555 const warm_color[] = {
     {.r=31, .g= 0, .b= 0},
@@ -130,6 +137,27 @@ static struct rgb555 const particle_color[] = {
     {.r=31, .g=15, .b= 0},
     {.r=15, .g= 0, .b=31},
 };
+
+static void draw_paddle(void const *self, struct fb *fb, int winner) {
+    struct paddle const *p = self;
+    (void)winner;
+    fill_rect(fb, p->x, p->y, paddle_w, paddle_h, p->color);
+}
+
+static void draw_ball(void const *self, struct fb *fb, int winner) {
+    struct ball const *b = self;
+    if (!winner) {
+        fill_rect(fb, b->x, b->y, ball_size, ball_size, b->color);
+    }
+}
+
+static void draw_particle(void const *self, struct fb *fb, int winner) {
+    if (!winner) return;
+    struct particle const *p = self;
+    int const x = p->x,
+              y = p->y;
+    fill_rect(fb, x-1, y-1, 3, 3, p->color);
+}
 
 void main(void) {
     *reg_dispcnt = 4 | (1<<10);
@@ -162,6 +190,7 @@ void main(void) {
         .vx = 0,
         .vy = 0,
         .color = (uint8_t)WARM0,
+        .draw = draw_paddle,
     };
     struct paddle right = {
         .x = W-10-paddle_w,
@@ -169,6 +198,7 @@ void main(void) {
         .vx = 0,
         .vy = 0,
         .color = (uint8_t)COOL0,
+        .draw = draw_paddle,
     };
     struct ball ball = {
         .x  = W/2 - ball_size/2,
@@ -176,6 +206,7 @@ void main(void) {
         .vx = -ball_speed,
         .vy = 0,
         .color = (uint8_t)BALL,
+        .draw = draw_ball,
     };
 
     struct particle particle[9];  // only 8 draw, but this makes for pretty color cycling
@@ -197,6 +228,7 @@ void main(void) {
             default: p->vx = +s;  p->vy = +s;  break;
         }
         p->color = (uint8_t)(PARTICLES + (++next_particle_color % len(particle_color)));
+        p->draw  = draw_particle;
     }
 
     int score1 = 0,
@@ -292,21 +324,17 @@ void main(void) {
         }
 
         clear(fb, BG);
-        fill_rect(fb,  left.x, left.y, paddle_w,paddle_h,  left.color);
-        fill_rect(fb, right.x,right.y, paddle_w,paddle_h, right.color);
-        if (!winner) {
-            fill_rect(fb, ball.x,ball.y, ball_size,ball_size,  ball.color);
-        }
+        left.draw(&left, fb, winner);
+        right.draw(&right, fb, winner);
+        ball.draw(&ball, fb, winner);
         draw_num(fb,                      30,10, score1,  left.color);
         draw_num(fb, W-30-8*(score2>=10?2:1),10, score2, right.color);
 
+        for (int i = 0; i < len(particle); i++) {
+            struct particle const *p = particle+i;
+            p->draw(p, fb, winner);
+        }
         if (winner) {
-            for (int i = 0; i < len(particle); i++) {
-                struct particle const *p = particle+i;
-                int const x = p->x,
-                          y = p->y;
-                fill_rect(fb, x-1,y-1, 3,3, p->color);
-            }
             char const *msg = winner==1 ? "P1 WINS!" : "P2 WINS!";
             draw_str(fb, (W-8*7)/2, H/2-4, msg,
                      (winner==1 ? left.color : right.color));
