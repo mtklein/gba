@@ -13,9 +13,6 @@ static struct DMA volatile *dma = (struct DMA volatile*)0x040000B0;
 
 struct rgb555 *palette = (struct rgb555*)0x05000000;
 
-struct fb *front = (struct fb*)0x06000000,
-          *back  = (struct fb*)0x0600A000;
-
 void draw_init(void) {
     uint16_t const mode4 = 4,
                      bg2 = 1<<10;
@@ -28,9 +25,9 @@ struct fb* vsync_swap(void) {
 
     *reg_dispcnt ^= (1<<4);
     if (*reg_dispcnt & (1<<4)) {
-        return front;
+        return (struct fb*)0x06000000;
     } else {
-        return back;
+        return (struct fb*)0x0600A000;
     }
 }
 

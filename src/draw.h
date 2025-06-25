@@ -11,10 +11,10 @@ extern struct rgb555 {
     uint16_t x : 1;
 } *palette;
 
-extern struct fb {
+struct fb {
     uint16_t lo : 8;
     uint16_t hi : 8;
-} *front, *back;
+};
 
 void draw_init(void);
 

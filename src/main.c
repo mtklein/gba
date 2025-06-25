@@ -73,9 +73,6 @@ void main(void) {
     *color++ = (struct rgb555){.r=15, .g= 0, .b=31};
     int const wrap_particle = (int)(color - palette) - PARTICLE - 1;
 
-    clear(front, BG);
-    clear(back , BG);
-
     struct entity e[] = {
         {
             .x     = W/2 - ball_size/2,
