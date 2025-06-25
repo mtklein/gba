@@ -299,10 +299,12 @@ void main(void) {
         fill_rect(fb,  ball.x>>8,  ball.y>>8, ball_size, ball_size,  BALL);
         draw_num(fb,                      30,10, score1, LEFT);
         draw_num(fb, W-30-8*(score2>=10?2:1),10, score2, RIGHT);
+        if (fireworks) {
+            firework_draw(fb);
+        }
         if (winner) {
             char const *msg = winner==1 ? "P1 WINS!" : "P2 WINS!";
             draw_str(fb, (W-8*7)/2, H/2-4, msg, winner==1 ? LEFT : RIGHT);
-            firework_draw(fb);
         }
     }
 }
