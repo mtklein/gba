@@ -25,40 +25,39 @@ struct rgb555 {
 };
 static struct rgb555 *palette = (struct rgb555*)0x05000000;
 
-static uint16_t *front_fb = (uint16_t*)0x06000000,
-                *back_fb  = (uint16_t*)0x0600A000;
+struct fb {  // mode 4
+    uint16_t lo : 8;
+    uint16_t hi : 8;
+};
+static struct fb *front = (struct fb*)0x06000000,
+                 *back  = (struct fb*)0x0600A000;
 
-static uint16_t* vsync_swap(void) {
+static struct fb* vsync_swap(void) {
     while (*reg_vcount >= H);
     while (*reg_vcount <  H);
 
     *reg_dispcnt ^= (1<<4);
     if (*reg_dispcnt & (1<<4)) {
-        return front_fb;
+        return front;
     } else {
-        return back_fb;
+        return back;
     }
 }
 
-union mode4_pair {
-    uint16_t both;
-    struct { uint8_t lo,hi; };
-};
-
-static inline void set_pixel(uint16_t *fb, int x, int y, uint8_t color) {
+static inline void set_pixel(struct fb *fb, int x, int y, uint8_t color) {
     if ((unsigned)x < W && (unsigned)y < H) {
         int const ix = y * (W/2) + x/2;
-        union mode4_pair px = {fb[ix]};
+        struct fb px = fb[ix];
         if (x & 1) {
             px.hi = color;
         } else {
             px.lo = color;
         }
-        fb[ix] = px.both;
+        fb[ix] = px;
     }
 }
 
-static void fill_rect(uint16_t *fb, int l, int t, int w, int h, uint8_t color) {
+static void fill_rect(struct fb *fb, int l, int t, int w, int h, uint8_t color) {
     int const r = l+w,
               b = t+h;
     for (int y = t; y < b; y++)
@@ -67,14 +66,14 @@ static void fill_rect(uint16_t *fb, int l, int t, int w, int h, uint8_t color) {
     }
 }
 
-static void clear(uint16_t *fb, uint8_t color) {
-    union mode4_pair const src = {.lo=color, .hi=color};
+static void clear(struct fb *fb, uint8_t color) {
+    struct fb const src = {.lo=color, .hi=color};
     dma[3].src = &src;
     dma[3].dst = fb;
     dma[3].cnt = (W*H/2) | (2<<23) | (1u<<31);
 }
 
-static void draw_char(uint16_t *fb, int x, int y, char ch, uint8_t color) {
+static void draw_char(struct fb *fb, int x, int y, char ch, uint8_t color) {
     uint8_t const *glyph = font_get(ch);
     for (int r = 0; r < 8; r++)
     for (int c = 0; c < 8; c++) {
@@ -84,14 +83,14 @@ static void draw_char(uint16_t *fb, int x, int y, char ch, uint8_t color) {
     }
 }
 
-static void draw_str(uint16_t *fb, int x, int y, char const *s, uint8_t color) {
+static void draw_str(struct fb *fb, int x, int y, char const *s, uint8_t color) {
     for (; *s; x += 8) {
         draw_char(fb, x, y, *s++, color);
     }
 }
 
 
-static void draw_num(uint16_t *fb, int x, int y, int v, uint8_t color) {
+static void draw_num(struct fb *fb, int x, int y, int v, uint8_t color) {
     if (v >= 10) {
         int const tens = (v * 103) >> 10;
         draw_char(fb, x, y, (char)('0' + tens), color);
@@ -146,8 +145,8 @@ void main(void) {
     for (int i = 0; i < len(particle_color); i++) {
         palette[PARTICLES + i] = particle_color[i];
     }
-    clear(front_fb, BG);
-    clear( back_fb, BG);
+    clear(front, BG);
+    clear(back , BG);
 
     struct paddle left  = {.x=           10, .y = (H - paddle_h)/2};
     struct paddle right = {.x=W-10-paddle_w, .y = (H - paddle_h)/2};
@@ -186,7 +185,7 @@ void main(void) {
           cool = 0;
 
     uint16_t keys = 0, held;
-    for (uint16_t *fb; (fb = vsync_swap());) {
+    for (struct fb *fb; (fb = vsync_swap());) {
         held = keys;
         keys = ~*reg_keys;
 
