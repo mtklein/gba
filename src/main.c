@@ -3,8 +3,8 @@
 
 #define len(x) (int)(sizeof x / sizeof *x)
 
-static int const W = 240,
-                 H = 160;
+static short const W = 240,
+                   H = 160;
 
 struct DMA {
     void const *src;
@@ -44,7 +44,7 @@ static struct fb* vsync_swap(void) {
     }
 }
 
-static inline void set_pixel(struct fb *fb, int x, int y, uint8_t color) {
+static inline void set_pixel(struct fb *fb, short x, short y, uint8_t color) {
     if ((unsigned)x < W && (unsigned)y < H) {
         int const ix = y * (W/2) + x/2;
         struct fb px = fb[ix];
@@ -57,11 +57,11 @@ static inline void set_pixel(struct fb *fb, int x, int y, uint8_t color) {
     }
 }
 
-static void fill_rect(struct fb *fb, int l, int t, int w, int h, uint8_t color) {
-    int const r = l+w,
-              b = t+h;
-    for (int y = t; y < b; y++)
-    for (int x = l; x < r; x++) {
+static void fill_rect(struct fb *fb, short l, short t, short w, short h, uint8_t color) {
+    short const r = l+w,
+                b = t+h;
+    for (short y = t; y < b; y++)
+    for (short x = l; x < r; x++) {
         set_pixel(fb, x,y, color);
     }
 }
@@ -73,24 +73,24 @@ static void clear(struct fb *fb, uint8_t color) {
     dma[3].cnt = (W*H/2) | (2<<23) | (1u<<31);
 }
 
-static void draw_char(struct fb *fb, int x, int y, char ch, uint8_t color) {
+static void draw_char(struct fb *fb, short x, short y, char ch, uint8_t color) {
     uint8_t const *glyph = font_get(ch);
-    for (int r = 0; r < 8; r++)
-    for (int c = 0; c < 8; c++) {
+    for (short r = 0; r < 8; r++)
+    for (short c = 0; c < 8; c++) {
         if (glyph[r] & (1 << (7 - c))) {
             set_pixel(fb, x+c, y+r, color);
         }
     }
 }
 
-static void draw_str(struct fb *fb, int x, int y, char const *s, uint8_t color) {
+static void draw_str(struct fb *fb, short x, short y, char const *s, uint8_t color) {
     for (; *s; x += 8) {
         draw_char(fb, x, y, *s++, color);
     }
 }
 
 
-static void draw_num(struct fb *fb, int x, int y, int v, uint8_t color) {
+static void draw_num(struct fb *fb, short x, short y, int v, uint8_t color) {
     if (v >= 10) {
         int const tens = (v * 103) >> 10;
         draw_char(fb, x, y, (char)('0' + tens), color);
@@ -100,16 +100,22 @@ static void draw_num(struct fb *fb, int x, int y, int v, uint8_t color) {
     draw_char(fb, x, y, (char)('0' + v), color);
 }
 
+// .8 fixed point
+typedef int fixed;
+static short int_part(fixed f) { return (short)(f >> 8); }
+static fixed to_fixed(short n) { return n << 8; }
 
-static int const paddle_h     = 30,
-                 paddle_w     = 4,
-                 paddle_speed = 3,
-                 ball_size    = 4,
-                 ball_speed   = 384;
 
-struct paddle   { int const x; int y; };   // integer pixels
-struct ball     { int x,y,vx,vy; };        // .8 fixed-point pixels
-struct particle { int x,y,vx,vy, color; }; // .8 fixed-point pixels + color index
+static short const paddle_h     = 30,
+                   paddle_w     = 4,
+                   paddle_speed = 3,
+                   ball_size    = 4;
+
+static fixed const ball_speed = 384;
+
+struct paddle   { short x,y; };
+struct ball     { fixed x,y,vx,vy; };
+struct particle { fixed x,y,vx,vy; int color; };
 
 static struct rgb555 const warm_color[] = {
     {.r=31, .g= 0, .b= 0},
@@ -151,8 +157,8 @@ void main(void) {
     struct paddle left  = {.x=           10, .y = (H - paddle_h)/2};
     struct paddle right = {.x=W-10-paddle_w, .y = (H - paddle_h)/2};
     struct ball ball = {
-        .x  = (W/2 - ball_size/2) << 8,
-        .y  = (H/2 - ball_size/2) << 8,
+        .x  = to_fixed(W/2 - ball_size/2),
+        .y  = to_fixed(H/2 - ball_size/2),
         .vx = -ball_speed,
         .vy = 0,
     };
@@ -162,8 +168,8 @@ void main(void) {
 
     for (int i = 0; i < len(particle); i++) {
         struct particle *p = particle+i;
-        p->x = (W/2) << 8;
-        p->y = (H/2) << 8;
+        p->x = to_fixed(W/2);
+        p->y = to_fixed(H/2);
         int const s = 192;
         switch (i & 7) {
             case 0:  p->vx = +s;  p->vy =  0;  break;
@@ -213,8 +219,8 @@ void main(void) {
             ball.x += ball.vx;
             ball.y += ball.vy;
 
-            int const bx = ball.x >> 8,
-                      by = ball.y >> 8;
+            short const bx = int_part(ball.x),
+                        by = int_part(ball.y);
 
             if (by <= 0           && ball.vy < 0) { ball.vy = -ball.vy; }
             if (by >= H-ball_size && ball.vy > 0) { ball.vy = -ball.vy; }
@@ -223,8 +229,8 @@ void main(void) {
                   && by + ball_size >= left.y
                   && bx <= left.x + paddle_w
                   && by <= left.y + paddle_h) {
-                int const offset = (by + ball_size/2) - (left.y + paddle_h/2);
-                ball.x  = (left.x + paddle_w) << 8;
+                short const offset = (by + ball_size/2) - (left.y + paddle_h/2);
+                ball.x  = to_fixed(left.x + paddle_w);
                 ball.vx = +ball_speed;
                 ball.vy = offset*32;
             }
@@ -232,23 +238,23 @@ void main(void) {
                   && by + ball_size >= right.y
                   && bx <= right.x + paddle_w
                   && by <= right.y + paddle_h) {
-                int const offset = (by + ball_size/2) - (right.y + paddle_h/2);
-                ball.x  = (right.x - ball_size) << 8;
+                short const offset = (by + ball_size/2) - (right.y + paddle_h/2);
+                ball.x  = to_fixed(right.x - ball_size);
                 ball.vx = -ball_speed;
                 ball.vy = offset*32;
             }
 
             if (bx < 0) {
                 score2++;
-                ball.x  = (W/2)<<8;
-                ball.y  = (H/2)<<8;
+                ball.x  = to_fixed(W/2);
+                ball.y  = to_fixed(H/2);
                 ball.vx = +ball_speed;
                 ball.vy = 0;
             }
             if (bx > W - ball_size) {
                 score1++;
-                ball.x  = (W/2)<<8;
-                ball.y  = (H/2)<<8;
+                ball.x  = to_fixed(W/2);
+                ball.y  = to_fixed(H/2);
                 ball.vx = -ball_speed;
                 ball.vy = 0;
             }
@@ -263,7 +269,7 @@ void main(void) {
         fill_rect(fb,  left.x, left.y, paddle_w,paddle_h,  LEFT);
         fill_rect(fb, right.x,right.y, paddle_w,paddle_h, RIGHT);
         if (!winner) {
-            fill_rect(fb, ball.x>>8,ball.y>>8, ball_size,ball_size,  BALL);
+            fill_rect(fb, int_part(ball.x),int_part(ball.y), ball_size,ball_size,  BALL);
         }
         draw_num(fb,                      30,10, score1,  LEFT);
         draw_num(fb, W-30-8*(score2>=10?2:1),10, score2, RIGHT);
@@ -271,8 +277,8 @@ void main(void) {
         if (winner) {
             for (int i = 0; i < len(particle); i++) {
                 struct particle const *p = particle+i;
-                int const x = p->x >> 8,
-                          y = p->y >> 8;
+                short const x = int_part(p->x),
+                            y = int_part(p->y);
                 fill_rect(fb, x-1,y-1, 3,3, (uint8_t)p->color);
             }
             char const *msg = winner==1 ? "P1 WINS!" : "P2 WINS!";
