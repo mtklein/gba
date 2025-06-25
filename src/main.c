@@ -141,16 +141,17 @@ static union rgb555 const fire_color[] = {
 };
 
 enum { FIRE_START = 4, NUM_FIRE_COLORS = len(fire_color) };
-#define N_PARTICLES 32
+#define N_PARTICLES 48
 static struct particle particles[N_PARTICLES];
 static int fireworks = 0;
+static int fire_col_idx = 0;
 
 static void firework_start(void) {
     for (int i = 0; i < N_PARTICLES; i++) {
         struct particle *p = &particles[i];
         p->x = (W/2) << 8;
         p->y = (H/2) << 8;
-        int const s = 192;
+        int const s = 512;
         switch (i & 7) {
             case 0:  p->vx = +s;  p->vy = 0;   break;
             case 1:  p->vx = +s;  p->vy = -s;  break;
@@ -161,21 +162,25 @@ static void firework_start(void) {
             case 6:  p->vx = 0;   p->vy = +s;  break;
             default: p->vx = +s;  p->vy = +s;  break;
         }
-        p->life = 60;
-        p->color = FIRE_START + i % NUM_FIRE_COLORS;
+        p->life = 120;
+        p->color = FIRE_START + (fire_col_idx + i) % NUM_FIRE_COLORS;
     }
     fireworks = 1;
+    fire_col_idx = (fire_col_idx + 1) % NUM_FIRE_COLORS;
 }
 
 static void firework_update(void) {
+    int active = 0;
     for (int i = 0; i < N_PARTICLES; i++) {
         struct particle *p = &particles[i];
         if (p->life <= 0) continue;
         p->x += p->vx;
         p->y += p->vy;
-        p->vy += 8;
+        p->vy += 16;
         p->life--;
+        active = 1;
     }
+    if (!active) firework_start();
 }
 
 static void firework_draw(uint16_t *fb) {
@@ -184,11 +189,13 @@ static void firework_draw(uint16_t *fb) {
         if (p->life <= 0) continue;
         int const x = p->x >> 8;
         int const y = p->y >> 8;
-        if ((unsigned)x < W && (unsigned)y < H) {
-            set_pixel(fb, x, y, (uint8_t)p->color);
-            if ((unsigned)(x+1) < W) set_pixel(fb, x+1, y, (uint8_t)p->color);
-            if ((unsigned)(y+1) < H) set_pixel(fb, x, y+1, (uint8_t)p->color);
-            if ((unsigned)(x+1) < W && (unsigned)(y+1) < H) set_pixel(fb, x+1, y+1, (uint8_t)p->color);
+        for (int dy=-1; dy<=1; dy++)
+        for (int dx=-1; dx<=1; dx++) {
+            int const xx = x + dx;
+            int const yy = y + dy;
+            if ((unsigned)xx < W && (unsigned)yy < H) {
+                set_pixel(fb, xx, yy, (uint8_t)p->color);
+            }
         }
     }
 }
