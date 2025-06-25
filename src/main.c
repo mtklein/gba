@@ -206,7 +206,7 @@ void main(void) {
                 struct particle *p = particle+i;
                 p->x  += p->vx;
                 p->y  += p->vy;
-                p->vy += 1.0K >> 8;
+                p->vy += 1/256.0K;
                 p->color = PARTICLES + (++next_particle_color % len(particle_color));
             }
         } else {
@@ -226,7 +226,7 @@ void main(void) {
                 int const offset = (by + ball_size/2) - (left.y + paddle_h/2);
                 ball.x  = left.x + paddle_w;
                 ball.vx = +ball_speed;
-                ball.vy = (_Accum)offset >> 3;
+                ball.vy = offset >> 3;
             }
             if (1 && bx + ball_size >= right.x
                   && by + ball_size >= right.y
@@ -235,7 +235,7 @@ void main(void) {
                 int const offset = (by + ball_size/2) - (right.y + paddle_h/2);
                 ball.x  = right.x - ball_size;
                 ball.vx = -ball_speed;
-                ball.vy = (_Accum)offset >> 3;
+                ball.vy = offset >> 3;
             }
 
             if (bx < 0) {
