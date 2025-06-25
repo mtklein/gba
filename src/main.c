@@ -69,11 +69,9 @@ static void fill_rect(uint16_t *fb, int l, int t, int w, int h, uint8_t color) {
 
 static void clear(uint16_t *fb, uint8_t color) {
     union mode4_pair const src = {.lo=color, .hi=color};
-    if (dma[3].cnt & (1u<<31)) __builtin_trap();
     dma[3].src = &src;
     dma[3].dst = fb;
     dma[3].cnt = (W*H/2) | (2<<23) | (1u<<31);
-    if (dma[3].cnt & (1u<<31)) __builtin_trap();
 }
 
 static void draw_char(uint16_t *fb, int x, int y, char ch, uint8_t color) {
