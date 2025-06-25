@@ -115,29 +115,6 @@ struct ball     { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3];
 struct particle { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3];
                    draw_fn *draw; };
 
-static struct rgb555 const warm_color[] = {
-    {.r=31, .g= 0, .b= 0},
-    {.r=25, .g= 0, .b=20},
-    {.r=31, .g=20, .b= 0},
-    {.r=25, .g=25, .b= 0},
-};
-static struct rgb555 const cool_color[] = {
-    {.r= 0, .g= 0, .b=31},
-    {.r= 0, .g=25, .b=25},
-    {.r= 0, .g=31, .b= 0},
-    {.r=10, .g=10, .b=20},
-};
-static struct rgb555 const particle_color[] = {
-    {.r=31, .g= 0, .b= 0},
-    {.r=31, .g=31, .b= 0},
-    {.r= 0, .g=31, .b= 0},
-    {.r= 0, .g=31, .b=31},
-    {.r= 0, .g= 0, .b=31},
-    {.r=31, .g= 0, .b=31},
-    {.r=31, .g=15, .b= 0},
-    {.r=15, .g= 0, .b=31},
-};
-
 static void draw_paddle(void const *self, struct fb *fb, int winner) {
     struct paddle const *p = self;
     (void)winner;
@@ -161,25 +138,39 @@ static void draw_particle(void const *self, struct fb *fb, int winner) {
 void main(void) {
     *reg_dispcnt = 4 | (1<<10);
 
-    enum {
-        BG,
-        BALL,
-        WARM0, WARM1, WARM2, WARM3,
-        COOL0, COOL1, COOL2, COOL3,
-        PARTICLES
-    };
+    struct rgb555 *color = palette;
 
-    palette[BG  ] = (struct rgb555){.r=31,.g=31,.b=31};
-    palette[BALL] = (struct rgb555){.r=0, .g=0, .b=0};
-    for (int i = 0; i < len(warm_color); i++) {
-        palette[WARM0 + i] = warm_color[i];
-    }
-    for (int i = 0; i < len(cool_color); i++) {
-        palette[COOL0 + i] = cool_color[i];
-    }
-    for (int i = 0; i < len(particle_color); i++) {
-        palette[PARTICLES + i] = particle_color[i];
-    }
+    uint8_t const BG = (uint8_t)(color - palette);
+    *color++ = (struct rgb555){.r=31,.g=31,.b=31};
+
+    uint8_t const BALL = (uint8_t)(color - palette);
+    *color++ = (struct rgb555){.r=0, .g=0, .b=0};
+
+    uint8_t const WARM = (uint8_t)(color - palette);
+    *color++ = (struct rgb555){.r=31, .g= 0, .b= 0};
+    *color++ = (struct rgb555){.r=25, .g= 0, .b=20};
+    *color++ = (struct rgb555){.r=31, .g=20, .b= 0};
+    *color++ = (struct rgb555){.r=25, .g=25, .b= 0};
+    int const warm_color_mask = (int)(color - palette) - WARM - 1;
+
+    uint8_t const COOL = (uint8_t)(color - palette);
+    *color++ = (struct rgb555){.r= 0, .g= 0, .b=31};
+    *color++ = (struct rgb555){.r= 0, .g=25, .b=25};
+    *color++ = (struct rgb555){.r= 0, .g=31, .b= 0};
+    *color++ = (struct rgb555){.r=10, .g=10, .b=20};
+    int const cool_color_mask = (int)(color - palette) - COOL - 1;
+
+    uint8_t const PARTICLE = (uint8_t)(color - palette);
+    *color++ = (struct rgb555){.r=31, .g= 0, .b= 0};
+    *color++ = (struct rgb555){.r=31, .g=31, .b= 0};
+    *color++ = (struct rgb555){.r= 0, .g=31, .b= 0};
+    *color++ = (struct rgb555){.r= 0, .g=31, .b=31};
+    *color++ = (struct rgb555){.r= 0, .g= 0, .b=31};
+    *color++ = (struct rgb555){.r=31, .g= 0, .b=31};
+    *color++ = (struct rgb555){.r=31, .g=15, .b= 0};
+    *color++ = (struct rgb555){.r=15, .g= 0, .b=31};
+    int const particle_color_mask = (int)(color - palette) - PARTICLE - 1;
+
     clear(front, BG);
     clear(back , BG);
 
@@ -188,24 +179,25 @@ void main(void) {
         .y = (H - paddle_h)/2,
         .vx = 0,
         .vy = 0,
-        .color = (uint8_t)WARM0,
         .draw = draw_paddle,
+        .color = WARM,
+
     };
     struct paddle right = {
         .x = W-10-paddle_w,
         .y = (H - paddle_h)/2,
         .vx = 0,
         .vy = 0,
-        .color = (uint8_t)COOL0,
         .draw = draw_paddle,
+        .color = COOL,
     };
     struct ball ball = {
         .x  = W/2 - ball_size/2,
         .y  = H/2 - ball_size/2,
         .vx = -ball_speed,
         .vy = 0,
-        .color = (uint8_t)BALL,
         .draw = draw_ball,
+        .color = BALL,
     };
 
     struct particle particle[9];  // only 8 draw, but this makes for pretty color cycling
@@ -226,8 +218,8 @@ void main(void) {
             case 6:  p->vx =  0;  p->vy = +s;  break;
             default: p->vx = +s;  p->vy = +s;  break;
         }
-        p->color = (uint8_t)(PARTICLES + (++next_particle_color % len(particle_color)));
         p->draw  = draw_particle;
+        p->color = (uint8_t)(PARTICLE + (++next_particle_color & particle_color_mask));
     }
 
     int score1 = 0,
@@ -249,10 +241,10 @@ void main(void) {
         if (keys & (1<<1)) { if (right.y < H-paddle_h) right.vy = +paddle_speed; }
 
         if ((keys & (1<<2)) && !(held & (1<<2))) {
-            left.color = (uint8_t)(WARM0 + (++warm % len(warm_color)));
+            left.color = (uint8_t)(WARM + (++warm & warm_color_mask));
         }
         if ((keys & (1<<3)) && !(held & (1<<3))) {
-            right.color = (uint8_t)(COOL0 + (++cool % len(cool_color)));
+            right.color = (uint8_t)(COOL + (++cool & cool_color_mask));
         }
 
         left.x  += left.vx;
@@ -270,7 +262,7 @@ void main(void) {
                 p->x  += p->vx;
                 p->y  += p->vy;
                 p->vy += 1/256.0K;
-                p->color = (uint8_t)(PARTICLES + (++next_particle_color % len(particle_color)));
+                p->color = (uint8_t)(PARTICLE + (++next_particle_color & particle_color_mask));
             }
         } else {
             ball.x += ball.vx;
