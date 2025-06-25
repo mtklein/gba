@@ -104,8 +104,8 @@ static _Accum const paddle_h     = 30,
                     ball_size    = 4,
                     ball_speed   = 1.5K;
 
-struct paddle   { _Accum x,y,vx,vy; };
-struct ball     { _Accum x,y,vx,vy; };
+struct paddle   { _Accum x,y,vx,vy; int color; };
+struct ball     { _Accum x,y,vx,vy; int color; };
 struct particle { _Accum x,y,vx,vy; int color; };
 
 static struct rgb555 const warm_color[] = {
@@ -145,13 +145,26 @@ void main(void) {
     clear(front, BG);
     clear(back , BG);
 
-    struct paddle left  = {.x=           10, .y = (H - paddle_h)/2, .vx=0, .vy=0};
-    struct paddle right = {.x=W-10-paddle_w, .y = (H - paddle_h)/2, .vx=0, .vy=0};
+    struct paddle left  = {
+        .x = 10,
+        .y = (H - paddle_h)/2,
+        .vx = 0,
+        .vy = 0,
+        .color = LEFT,
+    };
+    struct paddle right = {
+        .x = W-10-paddle_w,
+        .y = (H - paddle_h)/2,
+        .vx = 0,
+        .vy = 0,
+        .color = RIGHT,
+    };
     struct ball ball = {
         .x  = W/2 - ball_size/2,
         .y  = H/2 - ball_size/2,
         .vx = -ball_speed,
         .vy = 0,
+        .color = BALL,
     };
 
     struct particle particle[9];  // only 8 draw, but this makes for pretty color cycling
@@ -268,13 +281,13 @@ void main(void) {
         }
 
         clear(fb, BG);
-        fill_rect(fb,  left.x, left.y, paddle_w,paddle_h,  LEFT);
-        fill_rect(fb, right.x,right.y, paddle_w,paddle_h, RIGHT);
+        fill_rect(fb,  left.x, left.y, paddle_w,paddle_h,  (uint8_t)left.color);
+        fill_rect(fb, right.x,right.y, paddle_w,paddle_h, (uint8_t)right.color);
         if (!winner) {
-            fill_rect(fb, ball.x,ball.y, ball_size,ball_size,  BALL);
+            fill_rect(fb, ball.x,ball.y, ball_size,ball_size,  (uint8_t)ball.color);
         }
-        draw_num(fb,                      30,10, score1,  LEFT);
-        draw_num(fb, W-30-8*(score2>=10?2:1),10, score2, RIGHT);
+        draw_num(fb,                      30,10, score1,  (uint8_t)left.color);
+        draw_num(fb, W-30-8*(score2>=10?2:1),10, score2, (uint8_t)right.color);
 
         if (winner) {
             for (int i = 0; i < len(particle); i++) {
@@ -284,7 +297,8 @@ void main(void) {
                 fill_rect(fb, x-1,y-1, 3,3, (uint8_t)p->color);
             }
             char const *msg = winner==1 ? "P1 WINS!" : "P2 WINS!";
-            draw_str(fb, (W-8*7)/2, H/2-4, msg, winner==1 ? LEFT : RIGHT);
+            draw_str(fb, (W-8*7)/2, H/2-4, msg,
+                     (uint8_t)(winner==1 ? left.color : right.color));
         }
     }
 }
