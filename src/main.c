@@ -49,14 +49,16 @@ union mode4_pair {
 };
 
 static inline void set_pixel(uint16_t *fb, int x, int y, uint8_t color) {
-    int const ix = y * (W/2) + x/2;
-    union mode4_pair px = {fb[ix]};
-    if (x & 1) {
-        px.hi = color;
-    } else {
-        px.lo = color;
+    if ((unsigned)x < W && (unsigned)y < H) {
+        int const ix = y * (W/2) + x/2;
+        union mode4_pair px = {fb[ix]};
+        if (x & 1) {
+            px.hi = color;
+        } else {
+            px.lo = color;
+        }
+        fb[ix] = px.both;
     }
-    fb[ix] = px.both;
 }
 
 static void fill_rect(uint16_t *fb, int l, int t, int w, int h, uint8_t color) {
@@ -277,14 +279,7 @@ void main(void) {
                 struct particle const *p = particle+i;
                 int const x = p->x >> 8,
                           y = p->y >> 8;
-                for (int dy=-1; dy<=1; dy++)
-                for (int dx=-1; dx<=1; dx++) {
-                    int const xx = x + dx;
-                    int const yy = y + dy;
-                    if ((unsigned)xx < W && (unsigned)yy < H) {
-                        set_pixel(fb, xx, yy, (uint8_t)p->color);
-                    }
-                }
+                fill_rect(fb, x-1,y-1, 3,3, (uint8_t)p->color);
             }
             char const *msg = winner==1 ? "P1 WINS!" : "P2 WINS!";
             draw_str(fb, (W-8*7)/2, H/2-4, msg, winner==1 ? LEFT : RIGHT);
