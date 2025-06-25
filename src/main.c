@@ -98,14 +98,13 @@ static void draw_num(struct fb *fb, int x, int y, int v, uint8_t color) {
     draw_char(fb, x, y, (char)('0' + v), color);
 }
 
-static int const paddle_h     = 30,
-                 paddle_w     = 4,
-                 paddle_speed = 3,
-                 ball_size    = 4;
+static _Accum const paddle_h     = 30,
+                    paddle_w     = 4,
+                    paddle_speed = 3,
+                    ball_size    = 4,
+                    ball_speed   = 1.5K;
 
-static _Accum const ball_speed = 1.5K;
-
-struct paddle   { int x,y; };
+struct paddle   { _Accum x,y; };
 struct ball     { _Accum x,y,vx,vy; };
 struct particle { _Accum x,y,vx,vy; int color; };
 
