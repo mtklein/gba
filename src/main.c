@@ -3,18 +3,22 @@
 
 #define len(x) (int)(sizeof x / sizeof *x)
 
+static int clamp(int v, int lo, int hi) {
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
+}
+
 static uint16_t volatile *reg_keys = (uint16_t volatile*)0x04000130;
 
-static _Accum const paddle_h     = 30,
-                    paddle_w     = 4,
-                    paddle_speed = 3,
-                    ball_size    = 4,
-                    ball_speed   = 1.5K;
+static _Accum const paddle_h  = 30,
+                    paddle_w  = 4,
+                    ball_size = 5;
 
 struct entity;
 typedef void draw_fn(struct entity const*, struct fb *fb, int winner);
 
-struct entity { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3]; draw_fn *draw; };
+struct entity { _Accum x,y,vx,vy,ax,ay; uint8_t color; uint8_t pad[3]; draw_fn *draw; };
 
 static void draw_paddle(struct entity const *p, struct fb *fb, int winner) {
     (void)winner;
@@ -76,45 +80,40 @@ void main(void) {
         {
             .x     = W/2 - ball_size/2,
             .y     = H/2 - ball_size/2,
-            .vx    = -ball_speed,
-            .vy    = 0,
+            .vx    = -1.5K,
+            .ay    = 1/256.0K,
             .draw  = draw_ball,
             .color = BALL,
         },
         {
             .x     = 10,
             .y     = (H - paddle_h)/2,
-            .vx    = 0,
-            .vy    = 0,
             .draw  = draw_paddle,
             .color = WARM,
         },
         {
             .x     = W-10-paddle_w,
             .y     = (H - paddle_h)/2,
-            .vx    = 0,
-            .vy    = 0,
             .draw  = draw_paddle,
             .color = COOL,
         },
-        {.x=W/2, .y=H/2, .vx=0, .vy=0, .draw=draw_particle},
-        {.x=W/2, .y=H/2, .vx=0, .vy=0, .draw=draw_particle},
-        {.x=W/2, .y=H/2, .vx=0, .vy=0, .draw=draw_particle},
+        {.x=W/2, .y=H/2, .draw=draw_particle},
+        {.x=W/2, .y=H/2, .draw=draw_particle},
+        {.x=W/2, .y=H/2, .draw=draw_particle},
 
-        {.x=W/2, .y=H/2, .vx=0, .vy=0, .draw=draw_particle},
-        {.x=W/2, .y=H/2, .vx=0, .vy=0, .draw=draw_particle},
-        {.x=W/2, .y=H/2, .vx=0, .vy=0, .draw=draw_particle},
+        {.x=W/2, .y=H/2, .draw=draw_particle},
+        {.x=W/2, .y=H/2, .draw=draw_particle},
+        {.x=W/2, .y=H/2, .draw=draw_particle},
 
-        {.x=W/2, .y=H/2, .vx=0, .vy=0, .draw=draw_particle},
-        {.x=W/2, .y=H/2, .vx=0, .vy=0, .draw=draw_particle},
-        {.x=W/2, .y=H/2, .vx=0, .vy=0, .draw=draw_particle},
+        {.x=W/2, .y=H/2, .draw=draw_particle},
+        {.x=W/2, .y=H/2, .draw=draw_particle},
+        {.x=W/2, .y=H/2, .draw=draw_particle},
     };
-    int const particles = len(e) - 3;
-
     struct entity *ball     = e+0,
                   *left     = e+1,
                   *right    = e+2,
                   *particle = e+3;
+    int const particles = len(e) - 3;
 
     int score1 = 0,
         score2 = 0,
@@ -129,12 +128,11 @@ void main(void) {
         held = keys;
         keys = ~*reg_keys;
 
-        left->vy = 0;
-        right->vy = 0;
-        if (keys & (1<<6)) { if ( left->y >          0)  left->vy = -paddle_speed; }
-        if (keys & (1<<7)) { if ( left->y < H-paddle_h)  left->vy = +paddle_speed; }
-        if (keys & (1<<0)) { if (right->y >          0) right->vy = -paddle_speed; }
-        if (keys & (1<<1)) { if (right->y < H-paddle_h) right->vy = +paddle_speed; }
+        left->vy = right->vy = 0;
+        if (keys & (1<<6)) {  left->vy = -3; }
+        if (keys & (1<<7)) {  left->vy = +3; }
+        if (keys & (1<<0)) { right->vy = -3; }
+        if (keys & (1<<1)) { right->vy = +3; }
 
         if ((keys & (1<<2)) && !(held & (1<<2))) {
             left ->color = (uint8_t)(WARM + (++next_warm & wrap_warm));
@@ -142,99 +140,88 @@ void main(void) {
         if ((keys & (1<<3)) && !(held & (1<<3))) {
             right->color = (uint8_t)(COOL + (++next_cool & wrap_cool));
         }
-
-        left->x  += left->vx;
-        left->y  += left->vy;
-        right->x += right->vx;
-        right->y += right->vy;
-        if (left->y < 0)            left->y = 0;
-        if (left->y > H - paddle_h) left->y = H - paddle_h;
-        if (right->y < 0)           right->y = 0;
-        if (right->y > H - paddle_h) right->y = H - paddle_h;
-
         for (int i = 0; i < particles; i++) {
-            struct entity *p = particle+i;
-            p->x += p->vx;
-            p->y += p->vy;
-            if (winner) {
-                p->vy += 1/256.0K;
-                p->color = (uint8_t)(PARTICLE + (++next_particle & wrap_particle));
-            }
+            particle[i].color = (uint8_t)(PARTICLE + (++next_particle & wrap_particle));
         }
-        if (!winner) {
-            ball->x += ball->vx;
-            ball->y += ball->vy;
 
-            int const bx = ball->x,
-                      by = ball->y;
+        for (int i = 0; i < len(e); i++) {
+            e[i].x += e[i].vx;
+            e[i].y += e[i].vy;
 
-            if (by <= 0           && ball->vy < 0) { ball->vy = -ball->vy; }
-            if (by >= H-ball_size && ball->vy > 0) { ball->vy = -ball->vy; }
+            e[i].vx += e[i].ax;
+            e[i].vy += e[i].ay;
+        }
 
-            if (1 && bx + ball_size >= left->x
-                  && by + ball_size >= left->y
-                  && bx <= left->x + paddle_w
-                  && by <= left->y + paddle_h) {
-                int const offset = (by + ball_size/2) - (left->y + paddle_h/2);
-                ball->x  = left->x + paddle_w;
-                ball->vx = +ball_speed;
-                ball->vy = offset >> 3;
-            }
-            if (1 && bx + ball_size >= right->x
-                  && by + ball_size >= right->y
-                  && bx <= right->x + paddle_w
-                  && by <= right->y + paddle_h) {
-                int const offset = (by + ball_size/2) - (right->y + paddle_h/2);
-                ball->x  = right->x - ball_size;
-                ball->vx = -ball_speed;
-                ball->vy = offset >> 3;
-            }
+        left ->y = clamp( left->y, 0, H-paddle_h);
+        right->y = clamp(right->y, 0, H-paddle_h);
 
-            if (bx < 0) {
-                score2++;
-                ball->x  = W/2;
-                ball->y  = H/2;
-                ball->vx = +ball_speed;
-                ball->vy = 0;
-            }
-            if (bx > W - ball_size) {
-                score1++;
-                ball->x  = W/2;
-                ball->y  = H/2;
-                ball->vx = -ball_speed;
-                ball->vy = 0;
-            }
+        int const bx = ball->x,
+                  by = ball->y;
 
-            int diff = score1 - score2;
-            if (!winner && (score1 >= 11 || score2 >= 11) && (diff >= 2 || diff <= -2)) {
-                winner = diff > 0 ? 1 : 2;
-                for (int i = 0; i < particles; i++) {
-                    struct entity *p = particle+i;
-                    _Accum const s = 0.75K;
-                    switch (i & 7) {
-                        case 0:  p->vx = +s;  p->vy =  0;  break;
-                        case 1:  p->vx = +s;  p->vy = -s; break;
-                        case 2:  p->vx =  0;  p->vy = -s; break;
-                        case 3:  p->vx = -s;  p->vy = -s; break;
-                        case 4:  p->vx = -s;  p->vy =  0;  break;
-                        case 5:  p->vx = -s;  p->vy = +s; break;
-                        case 6:  p->vx =  0;  p->vy = +s; break;
-                        default: p->vx = +s;  p->vy = +s; break;
-                    }
+        if (by <= 0           && ball->vy < 0) { ball->vy = -ball->vy; }
+        if (by >= H-ball_size && ball->vy > 0) { ball->vy = -ball->vy; }
+
+        if (bx < 0) {
+            score2++;
+            ball->x  = W/2;
+            ball->y  = H/2;
+            ball->vx = -ball->vx;
+            ball->vy = 0;
+        }
+        if (bx > W - ball_size) {
+            score1++;
+            ball->x  = W/2;
+            ball->y  = H/2;
+            ball->vx = -ball->vx;
+            ball->vy = 0;
+        }
+
+        if (1 && left->x - ball_size <= bx && bx <= left->x + paddle_w
+              && left->y - ball_size <= by && by <= left->y + paddle_h) {
+            int const offset = (by + ball_size/2) - (left->y + paddle_h/2);
+            ball->x  = left->x + paddle_w;
+            ball->vx = -ball->vx;
+            ball->vy = (_Accum)offset >> 3;
+        }
+        if (1 && right->x - ball_size <= bx && bx <= right->x + paddle_w
+              && right->y - ball_size <= by && by <= right->y + paddle_h) {
+            int const offset = (by + ball_size/2) - (right->y + paddle_h/2);
+            ball->x  = right->x - ball_size;
+            ball->vx = -ball->vx;
+            ball->vy = (_Accum)offset >> 3;
+        }
+
+        int diff = score1 - score2;
+        if (winner == 0 && (score1 >= 11 || score2 >= 11) && (diff >= 2 || diff <= -2)) {
+            winner = diff > 0 ? 1 : 2;
+
+            for (int i = 0; i < particles; i++) {
+                struct entity *p = particle+i;
+                _Accum const s = 0.75K;
+                switch (i & 7) {
+                    case 0:  p->vx = +s;  p->vy =  0; break;
+                    case 1:  p->vx = +s;  p->vy = -s; break;
+                    case 2:  p->vx =  0;  p->vy = -s; break;
+                    case 3:  p->vx = -s;  p->vy = -s; break;
+                    case 4:  p->vx = -s;  p->vy =  0; break;
+                    case 5:  p->vx = -s;  p->vy = +s; break;
+                    case 6:  p->vx =  0;  p->vy = +s; break;
+                    default: p->vx = +s;  p->vy = +s; break;
                 }
+                p->ay = 1/256.0K;
             }
+            ball->vx = ball->vy = ball->ax = ball->ay = 0;
         }
 
         clear(fb, BG);
         for (int i = 0; i < len(e); i++) {
             e[i].draw(e+i, fb, winner);
         }
-
         draw_num(fb,  left->color,                      30,10, score1);
         draw_num(fb, right->color, W-30-8*(score2>=10?2:1),10, score2);
         if (winner) {
-            char const *msg = winner==1 ? "P1 WINS!" : "P2 WINS!";
-            draw_str(fb, (winner==1 ? left->color : right->color), (W-8*7)/2, H/2-4, msg);
+            draw_str(fb, winner==1 ? left->color : right->color, (W-8*7)/2, H/2-4
+                       , winner==1 ? "P1 WINS!" : "P2 WINS!");
         }
     }
 }
