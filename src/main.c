@@ -205,19 +205,10 @@ void main(void) {
 
     for (int i = 0; i < len(particle); i++) {
         struct particle *p = particle+i;
-        p->x = W/2;
-        p->y = H/2;
-        _Accum const s = 0.75K;
-        switch (i & 7) {
-            case 0:  p->vx = +s;  p->vy =  0;  break;
-            case 1:  p->vx = +s;  p->vy = -s;  break;
-            case 2:  p->vx =  0;  p->vy = -s;  break;
-            case 3:  p->vx = -s;  p->vy = -s;  break;
-            case 4:  p->vx = -s;  p->vy =  0;  break;
-            case 5:  p->vx = -s;  p->vy = +s;  break;
-            case 6:  p->vx =  0;  p->vy = +s;  break;
-            default: p->vx = +s;  p->vy = +s;  break;
-        }
+        p->x  = W/2;
+        p->y  = H/2;
+        p->vx = 0;
+        p->vy = 0;
         p->draw  = draw_particle;
         p->color = (uint8_t)(PARTICLE + (++next_particle_color & particle_color_mask));
     }
@@ -256,15 +247,16 @@ void main(void) {
         if (right.y < 0)           right.y = 0;
         if (right.y > H - paddle_h) right.y = H - paddle_h;
 
-        if (winner) {
-            for (int i = 0; i < len(particle); i++) {
-                struct particle *p = particle+i;
-                p->x  += p->vx;
-                p->y  += p->vy;
+        for (int i = 0; i < len(particle); i++) {
+            struct particle *p = particle+i;
+            p->x += p->vx;
+            p->y += p->vy;
+            if (winner) {
                 p->vy += 1/256.0K;
                 p->color = (uint8_t)(PARTICLE + (++next_particle_color & particle_color_mask));
             }
-        } else {
+        }
+        if (!winner) {
             ball.x += ball.vx;
             ball.y += ball.vy;
 
@@ -309,8 +301,22 @@ void main(void) {
             }
 
             int diff = score1 - score2;
-            if ((score1 >= 11 || score2 >= 11) && (diff >= 2 || diff <= -2)) {
+            if (!winner && (score1 >= 11 || score2 >= 11) && (diff >= 2 || diff <= -2)) {
                 winner = diff > 0 ? 1 : 2;
+                for (int i = 0; i < len(particle); i++) {
+                    struct particle *p = particle+i;
+                    _Accum const s = 0.75K;
+                    switch (i & 7) {
+                        case 0:  p->vx = +s;  p->vy =  0;  break;
+                        case 1:  p->vx = +s;  p->vy = -s; break;
+                        case 2:  p->vx =  0;  p->vy = -s; break;
+                        case 3:  p->vx = -s;  p->vy = -s; break;
+                        case 4:  p->vx = -s;  p->vy =  0;  break;
+                        case 5:  p->vx = -s;  p->vy = +s; break;
+                        case 6:  p->vx =  0;  p->vy = +s; break;
+                        default: p->vx = +s;  p->vy = +s; break;
+                    }
+                }
             }
         }
 
