@@ -145,18 +145,17 @@ static void draw_paddle(void const *self, struct fb *fb, int winner) {
 }
 
 static void draw_ball(void const *self, struct fb *fb, int winner) {
-    struct ball const *b = self;
     if (!winner) {
+        struct ball const *b = self;
         fill_rect(fb, b->x, b->y, ball_size, ball_size, b->color);
     }
 }
 
 static void draw_particle(void const *self, struct fb *fb, int winner) {
-    if (!winner) return;
-    struct particle const *p = self;
-    int const x = p->x,
-              y = p->y;
-    fill_rect(fb, x-1, y-1, 3, 3, p->color);
+    if (winner) {
+        struct particle const *p = self;
+        fill_rect(fb, p->x-1, p->y-1, 3, 3, p->color);
+    }
 }
 
 void main(void) {
