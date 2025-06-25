@@ -218,12 +218,10 @@ void main(void) {
         if (keys & (1<<1)) { if (right.y < H-paddle_h) right.vy = +paddle_speed; }
 
         if ((keys & (1<<2)) && !(held & (1<<2))) {
-            warm = (warm + 1) % len(warm_color);
-            left.color = WARM0 + warm;
+            left.color = WARM0 + (++warm % len(warm_color));
         }
         if ((keys & (1<<3)) && !(held & (1<<3))) {
-            cool = (cool + 1) % len(cool_color);
-            right.color = COOL0 + cool;
+            right.color = COOL0 + (++cool % len(cool_color));
         }
 
         left.x  += left.vx;
