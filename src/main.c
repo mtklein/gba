@@ -1,102 +1,9 @@
 #include <stdint.h>
-#include "font.h"
+#include "draw.h"
 
 #define len(x) (int)(sizeof x / sizeof *x)
 
-static int const W = 240,
-                 H = 160;
-
-struct DMA {
-    void const *src;
-    void       *dst;
-    uint32_t    cnt;
-};
-static struct DMA volatile *dma  = (struct DMA volatile*)0x040000B0;
-
-static uint16_t volatile *reg_dispcnt = (uint16_t volatile*)0x04000000,
-                         *reg_vcount  = (uint16_t volatile*)0x04000006,
-                         *reg_keys    = (uint16_t volatile*)0x04000130;
-
-struct rgb555 {
-    uint16_t r : 5;
-    uint16_t g : 5;
-    uint16_t b : 5;
-    uint16_t x : 1;
-};
-static struct rgb555 *palette = (struct rgb555*)0x05000000;
-
-struct fb {  // mode 4
-    uint16_t lo : 8;
-    uint16_t hi : 8;
-};
-static struct fb *front = (struct fb*)0x06000000,
-                 *back  = (struct fb*)0x0600A000;
-
-static struct fb* vsync_swap(void) {
-    while (*reg_vcount >= H);
-    while (*reg_vcount <  H);
-
-    *reg_dispcnt ^= (1<<4);
-    if (*reg_dispcnt & (1<<4)) {
-        return front;
-    } else {
-        return back;
-    }
-}
-
-static inline void set_pixel(struct fb *fb, int x, int y, uint8_t color) {
-    if ((unsigned)x < W && (unsigned)y < H) {
-        struct fb *px = fb + y * (W/2) + x/2;
-        if (x & 1) {
-            px->hi = color;
-        } else {
-            px->lo = color;
-        }
-    }
-}
-
-static void fill_rect(struct fb *fb, int l, int t, int w, int h, uint8_t color) {
-    int const r = l+w,
-              b = t+h;
-    for (int y = t; y < b; y++)
-    for (int x = l; x < r; x++) {
-        set_pixel(fb, x,y, color);
-    }
-}
-
-static void clear(struct fb *fb, uint8_t color) {
-    struct fb const src = {.lo=color, .hi=color};
-    dma[3].src = &src;
-    dma[3].dst = fb;
-    dma[3].cnt = (W*H/2) | (2<<23) | (1u<<31);
-}
-
-static void draw_char(struct fb *fb, int x, int y, char ch, uint8_t color) {
-    uint8_t const *glyph = font_get(ch);
-    for (int r = 0; r < 8; r++)
-    for (int c = 0; c < 8; c++) {
-        if (glyph[r] & (1 << (7 - c))) {
-            set_pixel(fb, x+c, y+r, color);
-        }
-    }
-}
-
-static void draw_str(struct fb *fb, int x, int y, char const *s, uint8_t color) {
-    for (; *s; x += 8) {
-        draw_char(fb, x, y, *s++, color);
-    }
-}
-
-
-static void draw_num(struct fb *fb, int x, int y, int v, uint8_t color) {
-    if (v >= 10) {
-        int const tens = (v * 103) >> 10;
-        draw_char(fb, x, y, (char)('0' + tens), color);
-        x += 8;
-        v -= 10*tens;
-    }
-    draw_char(fb, x, y, (char)('0' + v), color);
-}
+static uint16_t volatile *reg_keys = (uint16_t volatile*)0x04000130;
 
 static _Accum const paddle_h     = 30,
                     paddle_w     = 4,
@@ -104,39 +11,34 @@ static _Accum const paddle_h     = 30,
                     ball_size    = 4,
                     ball_speed   = 1.5K;
 
-struct fb;
-
 typedef void draw_fn(void const *self, struct fb *fb, int winner);
 
-struct paddle   { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3];
-                   draw_fn *draw; };
-struct ball     { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3];
-                   draw_fn *draw; };
-struct particle { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3];
-                   draw_fn *draw; };
+struct paddle   { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3]; draw_fn *draw; };
+struct ball     { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3]; draw_fn *draw; };
+struct particle { _Accum x,y,vx,vy; uint8_t color; uint8_t pad[3]; draw_fn *draw; };
 
 static void draw_paddle(void const *self, struct fb *fb, int winner) {
     struct paddle const *p = self;
     (void)winner;
-    fill_rect(fb, p->x, p->y, paddle_w, paddle_h, p->color);
+    fill_rect(fb, p->color, p->x,p->y, paddle_w,paddle_h);
 }
 
 static void draw_ball(void const *self, struct fb *fb, int winner) {
     if (!winner) {
         struct ball const *b = self;
-        fill_rect(fb, b->x, b->y, ball_size, ball_size, b->color);
+        fill_rect(fb, b->color, b->x,b->y, ball_size,ball_size);
     }
 }
 
 static void draw_particle(void const *self, struct fb *fb, int winner) {
     if (winner) {
         struct particle const *p = self;
-        fill_rect(fb, p->x-1, p->y-1, 3, 3, p->color);
+        fill_rect(fb, p->color, p->x-1, p->y-1, 3,3);
     }
 }
 
 void main(void) {
-    *reg_dispcnt = 4 | (1<<10);
+    draw_init();
 
     struct rgb555 *color = palette;
 
@@ -181,7 +83,6 @@ void main(void) {
         .vy = 0,
         .draw = draw_paddle,
         .color = WARM,
-
     };
     struct paddle right = {
         .x = W-10-paddle_w,
@@ -329,11 +230,11 @@ void main(void) {
             p->draw(p, fb, winner);
         }
 
-        draw_num(fb,                      30,10, score1,  left.color);
-        draw_num(fb, W-30-8*(score2>=10?2:1),10, score2, right.color);
+        draw_num(fb,  left.color,                      30,10, score1);
+        draw_num(fb, right.color, W-30-8*(score2>=10?2:1),10, score2);
         if (winner) {
             char const *msg = winner==1 ? "P1 WINS!" : "P2 WINS!";
-            draw_str(fb, (W-8*7)/2, H/2-4, msg, (winner==1 ? left.color : right.color));
+            draw_str(fb, (winner==1 ? left.color : right.color), (W-8*7)/2, H/2-4, msg);
         }
     }
 }
