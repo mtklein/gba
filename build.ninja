@@ -1,6 +1,6 @@
 builddir = out
 
-cc   = clang -flto
+cc   = clang
 ld   = ld.lld
 path = /opt/homebrew/opt/lld/bin:/opt/homebrew/opt/llvm/bin:$$PATH
 arch = -target armv4t-none-eabi -mthumb

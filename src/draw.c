@@ -52,7 +52,8 @@ void fill_rect(struct fb *fb, uint8_t color, int l, int t, int w, int h) {
 }
 
 void clear(struct fb *fb, uint8_t color) {
-    struct fb const src = {.lo=color, .hi=color};
+    static struct fb src;
+    src.lo = src.hi = color;
     dma[3].src = &src;
     dma[3].dst = fb;
     dma[3].cnt = (W*H/2) | (2<<23) | (1u<<31);
