@@ -134,11 +134,22 @@ static struct rgb555 const particle_color[] = {
 void main(void) {
     *reg_dispcnt = 4 | (1<<10);
 
-    enum {BG,BALL,LEFT,RIGHT,PARTICLES};
-    palette[BG   ] = (struct rgb555){.r=31,.g=31,.b=31};
-    palette[BALL ] = (struct rgb555){.r=0, .g=0, .b=0 };
-    palette[LEFT ] = *warm_color;
-    palette[RIGHT] = *cool_color;
+    enum {
+        BG,
+        BALL,
+        WARM0, WARM1, WARM2, WARM3,
+        COOL0, COOL1, COOL2, COOL3,
+        PARTICLES
+    };
+
+    palette[BG  ] = (struct rgb555){.r=31,.g=31,.b=31};
+    palette[BALL] = (struct rgb555){.r=0, .g=0, .b=0};
+    for (int i = 0; i < len(warm_color); i++) {
+        palette[WARM0 + i] = warm_color[i];
+    }
+    for (int i = 0; i < len(cool_color); i++) {
+        palette[COOL0 + i] = cool_color[i];
+    }
     for (int i = 0; i < len(particle_color); i++) {
         palette[PARTICLES + i] = particle_color[i];
     }
@@ -150,14 +161,14 @@ void main(void) {
         .y = (H - paddle_h)/2,
         .vx = 0,
         .vy = 0,
-        .color = LEFT,
+        .color = WARM0,
     };
     struct paddle right = {
         .x = W-10-paddle_w,
         .y = (H - paddle_h)/2,
         .vx = 0,
         .vy = 0,
-        .color = RIGHT,
+        .color = COOL0,
     };
     struct ball ball = {
         .x  = W/2 - ball_size/2,
@@ -207,10 +218,12 @@ void main(void) {
         if (keys & (1<<1)) { if (right.y < H-paddle_h) right.vy = +paddle_speed; }
 
         if ((keys & (1<<2)) && !(held & (1<<2))) {
-            palette[LEFT]  = warm_color[++warm % len(warm_color)];
+            warm = (warm + 1) % len(warm_color);
+            left.color = WARM0 + warm;
         }
         if ((keys & (1<<3)) && !(held & (1<<3))) {
-            palette[RIGHT] = cool_color[++cool % len(cool_color)];
+            cool = (cool + 1) % len(cool_color);
+            right.color = COOL0 + cool;
         }
 
         left.x  += left.vx;
