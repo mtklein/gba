@@ -100,10 +100,10 @@ static void draw_num(struct fb *fb, int x, int y, int v, uint8_t color) {
     draw_char(fb, x, y, (char)('0' + v), color);
 }
 
-// .8 fixed point
-typedef int fixed;
-static int   int_part(fixed f) { return f >> 8; }
-static fixed to_fixed(int   n) { return n << 8; }
+// use built in fixed point type
+typedef _Accum fixed;
+static int   int_part(fixed f) { return (int)f; }
+static fixed to_fixed(int   n) { return (fixed)n; }
 
 
 static int const paddle_h     = 30,
@@ -111,7 +111,7 @@ static int const paddle_h     = 30,
                  paddle_speed = 3,
                  ball_size    = 4;
 
-static fixed const ball_speed = 384;
+static fixed const ball_speed = 1.5K;
 
 struct paddle   { int x,y; };
 struct ball     { fixed x,y,vx,vy; };
@@ -170,7 +170,7 @@ void main(void) {
         struct particle *p = particle+i;
         p->x = to_fixed(W/2);
         p->y = to_fixed(H/2);
-        int const s = 192;
+        fixed const s = 0.75K;
         switch (i & 7) {
             case 0:  p->vx = +s;  p->vy =  0;  break;
             case 1:  p->vx = +s;  p->vy = -s;  break;
@@ -212,7 +212,7 @@ void main(void) {
                 struct particle *p = particle+i;
                 p->x  += p->vx;
                 p->y  += p->vy;
-                p->vy += 1;
+                p->vy += 1.0K >> 8;
                 p->color = PARTICLES + (++next_particle_color % len(particle_color));
             }
         } else {
@@ -232,7 +232,7 @@ void main(void) {
                 int const offset = (by + ball_size/2) - (left.y + paddle_h/2);
                 ball.x  = to_fixed(left.x + paddle_w);
                 ball.vx = +ball_speed;
-                ball.vy = offset*32;
+                ball.vy = (_Accum)offset >> 3;
             }
             if (1 && bx + ball_size >= right.x
                   && by + ball_size >= right.y
@@ -241,7 +241,7 @@ void main(void) {
                 int const offset = (by + ball_size/2) - (right.y + paddle_h/2);
                 ball.x  = to_fixed(right.x - ball_size);
                 ball.vx = -ball_speed;
-                ball.vy = offset*32;
+                ball.vy = (_Accum)offset >> 3;
             }
 
             if (bx < 0) {
