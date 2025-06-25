@@ -17,8 +17,15 @@ static uint16_t volatile *reg_dispcnt = (uint16_t volatile*)0x04000000,
                          *reg_vcount  = (uint16_t volatile*)0x04000006,
                          *reg_keys    = (uint16_t volatile*)0x04000130;
 
-static uint16_t *palette  = (uint16_t*)0x05000000,
-                *front_fb = (uint16_t*)0x06000000,
+struct rgb555 {
+    uint16_t r : 5;
+    uint16_t g : 5;
+    uint16_t b : 5;
+    uint16_t x : 1;
+};
+static struct rgb555 *palette = (struct rgb555*)0x05000000;
+
+static uint16_t *front_fb = (uint16_t*)0x06000000,
                 *back_fb  = (uint16_t*)0x0600A000;
 
 static uint16_t* vsync_swap(void) {
@@ -32,16 +39,6 @@ static uint16_t* vsync_swap(void) {
         return back_fb;
     }
 }
-
-union rgb555 {
-    uint16_t rgbx;
-    struct {
-        uint16_t r : 5;
-        uint16_t g : 5;
-        uint16_t b : 5;
-        uint16_t x : 1;
-    };
-};
 
 union mode4_pair {
     uint16_t both;
@@ -117,19 +114,19 @@ struct paddle   { int const x; int y; };   // integer pixels
 struct ball     { int x,y,vx,vy; };        // .8 fixed-point pixels
 struct particle { int x,y,vx,vy, color; }; // .8 fixed-point pixels + color index
 
-static union rgb555 const warm_color[] = {
+static struct rgb555 const warm_color[] = {
     {.r=31, .g= 0, .b= 0},
     {.r=25, .g= 0, .b=20},
     {.r=31, .g=20, .b= 0},
     {.r=25, .g=25, .b= 0},
 };
-static union rgb555 const cool_color[] = {
+static struct rgb555 const cool_color[] = {
     {.r= 0, .g= 0, .b=31},
     {.r= 0, .g=25, .b=25},
     {.r= 0, .g=31, .b= 0},
     {.r=10, .g=10, .b=20},
 };
-static union rgb555 const particle_color[] = {
+static struct rgb555 const particle_color[] = {
     {.r=31, .g= 0, .b= 0},
     {.r=31, .g=31, .b= 0},
     {.r= 0, .g=31, .b= 0},
@@ -144,12 +141,12 @@ void main(void) {
     *reg_dispcnt = 4 | (1<<10);
 
     enum {BG,BALL,LEFT,RIGHT,PARTICLES};
-    palette[BG   ] = ((union rgb555){.r=31,.g=31,.b=31}).rgbx;
-    palette[BALL ] = ((union rgb555){.r=0, .g=0, .b=0 }).rgbx;
-    palette[LEFT ] = warm_color->rgbx;
-    palette[RIGHT] = cool_color->rgbx;
+    palette[BG   ] = (struct rgb555){.r=31,.g=31,.b=31};
+    palette[BALL ] = (struct rgb555){.r=0, .g=0, .b=0 };
+    palette[LEFT ] = *warm_color;
+    palette[RIGHT] = *cool_color;
     for (int i = 0; i < len(particle_color); i++) {
-        palette[PARTICLES + i] = particle_color[i].rgbx;
+        palette[PARTICLES + i] = particle_color[i];
     }
     clear(front_fb, BG);
     clear( back_fb, BG);
@@ -201,10 +198,10 @@ void main(void) {
         if (keys & (1<<1)) { if (right.y < H-paddle_h) right.y += paddle_speed; }
 
         if ((keys & (1<<2)) && !(held & (1<<2))) {
-            palette[LEFT]  = warm_color[++warm % len(warm_color)].rgbx;
+            palette[LEFT]  = warm_color[++warm % len(warm_color)];
         }
         if ((keys & (1<<3)) && !(held & (1<<3))) {
-            palette[RIGHT] = cool_color[++cool % len(cool_color)].rgbx;
+            palette[RIGHT] = cool_color[++cool % len(cool_color)];
         }
 
         if (winner) {
