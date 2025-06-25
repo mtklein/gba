@@ -104,7 +104,7 @@ static _Accum const paddle_h     = 30,
                     ball_size    = 4,
                     ball_speed   = 1.5K;
 
-struct paddle   { _Accum x,y; };
+struct paddle   { _Accum x,y,vx,vy; };
 struct ball     { _Accum x,y,vx,vy; };
 struct particle { _Accum x,y,vx,vy; int color; };
 
@@ -145,8 +145,8 @@ void main(void) {
     clear(front, BG);
     clear(back , BG);
 
-    struct paddle left  = {.x=           10, .y = (H - paddle_h)/2};
-    struct paddle right = {.x=W-10-paddle_w, .y = (H - paddle_h)/2};
+    struct paddle left  = {.x=           10, .y = (H - paddle_h)/2, .vx=0, .vy=0};
+    struct paddle right = {.x=W-10-paddle_w, .y = (H - paddle_h)/2, .vx=0, .vy=0};
     struct ball ball = {
         .x  = W/2 - ball_size/2,
         .y  = H/2 - ball_size/2,
@@ -186,10 +186,12 @@ void main(void) {
         held = keys;
         keys = ~*reg_keys;
 
-        if (keys & (1<<6)) { if ( left.y >          0)  left.y -= paddle_speed; }
-        if (keys & (1<<7)) { if ( left.y < H-paddle_h)  left.y += paddle_speed; }
-        if (keys & (1<<0)) { if (right.y >          0) right.y -= paddle_speed; }
-        if (keys & (1<<1)) { if (right.y < H-paddle_h) right.y += paddle_speed; }
+        left.vy = 0;
+        right.vy = 0;
+        if (keys & (1<<6)) { if ( left.y >          0)  left.vy = -paddle_speed; }
+        if (keys & (1<<7)) { if ( left.y < H-paddle_h)  left.vy = +paddle_speed; }
+        if (keys & (1<<0)) { if (right.y >          0) right.vy = -paddle_speed; }
+        if (keys & (1<<1)) { if (right.y < H-paddle_h) right.vy = +paddle_speed; }
 
         if ((keys & (1<<2)) && !(held & (1<<2))) {
             palette[LEFT]  = warm_color[++warm % len(warm_color)];
@@ -197,6 +199,15 @@ void main(void) {
         if ((keys & (1<<3)) && !(held & (1<<3))) {
             palette[RIGHT] = cool_color[++cool % len(cool_color)];
         }
+
+        left.x  += left.vx;
+        left.y  += left.vy;
+        right.x += right.vx;
+        right.y += right.vy;
+        if (left.y < 0)            left.y = 0;
+        if (left.y > H - paddle_h) left.y = H - paddle_h;
+        if (right.y < 0)           right.y = 0;
+        if (right.y > H - paddle_h) right.y = H - paddle_h;
 
         if (winner) {
             for (int i = 0; i < len(particle); i++) {
