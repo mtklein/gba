@@ -161,21 +161,21 @@ void main(void) {
         .y = (H - paddle_h)/2,
         .vx = 0,
         .vy = 0,
-        .color = (uint8_t)WARM0,
+        .color = WARM0,
     };
     struct paddle right = {
         .x = W-10-paddle_w,
         .y = (H - paddle_h)/2,
         .vx = 0,
         .vy = 0,
-        .color = (uint8_t)COOL0,
+        .color = COOL0,
     };
     struct ball ball = {
         .x  = W/2 - ball_size/2,
         .y  = H/2 - ball_size/2,
         .vx = -ball_speed,
         .vy = 0,
-        .color = (uint8_t)BALL,
+        .color = BALL,
     };
 
     struct particle particle[9];  // only 8 draw, but this makes for pretty color cycling
