@@ -111,8 +111,9 @@ static int const paddle_h     = 30,
                  ball_size    = 4,
                  ball_speed   = 384;
 
-struct paddle { int const x; int y; };  // integer pixels
-struct ball { int x,y,vx,vy; };         // .8 fixed point pixels
+struct paddle   { int const x; int y; };   // integer pixels
+struct ball     { int x,y,vx,vy; };        // .8 fixed-point pixels
+struct particle { int x,y,vx,vy, color; }; // .8 fixed-point pixels + color index
 
 static union rgb555 const warm_color[] = {
     {.r=31, .g= 0, .b= 0},
@@ -126,16 +127,28 @@ static union rgb555 const cool_color[] = {
     {.r= 0, .g=31, .b= 0},
     {.r=10, .g=10, .b=20},
 };
+static union rgb555 const particle_color[] = {
+    {.r=31, .g= 0, .b= 0},
+    {.r=31, .g=31, .b= 0},
+    {.r= 0, .g=31, .b= 0},
+    {.r= 0, .g=31, .b=31},
+    {.r= 0, .g= 0, .b=31},
+    {.r=31, .g= 0, .b=31},
+    {.r=31, .g=15, .b= 0},
+    {.r=15, .g= 0, .b=31},
+};
 
 void main(void) {
     *reg_dispcnt = 4 | (1<<10);
 
-    enum {BG,BALL,LEFT,RIGHT};
+    enum {BG,BALL,LEFT,RIGHT,PARTICLES};
     palette[BG   ] = ((union rgb555){.r=31,.g=31,.b=31}).rgbx;
     palette[BALL ] = ((union rgb555){.r=0, .g=0, .b=0 }).rgbx;
     palette[LEFT ] = warm_color->rgbx;
     palette[RIGHT] = cool_color->rgbx;
-
+    for (int i = 0; i < len(particle_color); i++) {
+        palette[PARTICLES + i] = particle_color[i].rgbx;
+    }
     clear(front_fb, BG);
     clear( back_fb, BG);
 
@@ -148,6 +161,27 @@ void main(void) {
         .vy = 0,
     };
 
+    struct particle particle[9];  // only 8 draw, but this makes for pretty color cycling
+    int next_particle_color = 0;
+
+    for (int i = 0; i < len(particle); i++) {
+        struct particle *p = particle+i;
+        p->x = (W/2) << 8;
+        p->y = (H/2) << 8;
+        int const s = 192;
+        switch (i & 7) {
+            case 0:  p->vx = +s;  p->vy =  0;  break;
+            case 1:  p->vx = +s;  p->vy = -s;  break;
+            case 2:  p->vx =  0;  p->vy = -s;  break;
+            case 3:  p->vx = -s;  p->vy = -s;  break;
+            case 4:  p->vx = -s;  p->vy =  0;  break;
+            case 5:  p->vx = -s;  p->vy = +s;  break;
+            case 6:  p->vx =  0;  p->vy = +s;  break;
+            default: p->vx = +s;  p->vy = +s;  break;
+        }
+        p->color = PARTICLES + (++next_particle_color % len(particle_color));
+    }
+
     int score1 = 0,
         score2 = 0,
         winner = 0,
@@ -159,19 +193,27 @@ void main(void) {
         held = keys;
         keys = ~*reg_keys;
 
-        if (!winner) {
-            if (keys & (1<<6)) { if ( left.y >          0)  left.y -= paddle_speed; }
-            if (keys & (1<<7)) { if ( left.y < H-paddle_h)  left.y += paddle_speed; }
-            if (keys & (1<<0)) { if (right.y >          0) right.y -= paddle_speed; }
-            if (keys & (1<<1)) { if (right.y < H-paddle_h) right.y += paddle_speed; }
+        if (keys & (1<<6)) { if ( left.y >          0)  left.y -= paddle_speed; }
+        if (keys & (1<<7)) { if ( left.y < H-paddle_h)  left.y += paddle_speed; }
+        if (keys & (1<<0)) { if (right.y >          0) right.y -= paddle_speed; }
+        if (keys & (1<<1)) { if (right.y < H-paddle_h) right.y += paddle_speed; }
 
-            if ((keys & (1<<2)) && !(held & (1<<2))) {
-                palette[LEFT]  = warm_color[++warm % len(warm_color)].rgbx;
-            }
-            if ((keys & (1<<3)) && !(held & (1<<3))) {
-                palette[RIGHT] = cool_color[++cool % len(cool_color)].rgbx;
-            }
+        if ((keys & (1<<2)) && !(held & (1<<2))) {
+            palette[LEFT]  = warm_color[++warm % len(warm_color)].rgbx;
+        }
+        if ((keys & (1<<3)) && !(held & (1<<3))) {
+            palette[RIGHT] = cool_color[++cool % len(cool_color)].rgbx;
+        }
 
+        if (winner) {
+            for (int i = 0; i < len(particle); i++) {
+                struct particle *p = particle+i;
+                p->x  += p->vx;
+                p->y  += p->vy;
+                p->vy += 1;
+                p->color = PARTICLES + (++next_particle_color % len(particle_color));
+            }
+        } else {
             ball.x += ball.vx;
             ball.y += ball.vy;
 
@@ -222,12 +264,28 @@ void main(void) {
         }
 
         clear(fb, BG);
-        fill_rect(fb,  left.x   ,  left.y   ,  paddle_w,  paddle_h,  LEFT);
-        fill_rect(fb, right.x   , right.y   ,  paddle_w,  paddle_h, RIGHT);
-        fill_rect(fb,  ball.x>>8,  ball.y>>8, ball_size, ball_size,  BALL);
-        draw_num(fb,                      30,10, score1, LEFT);
+        fill_rect(fb,  left.x, left.y, paddle_w,paddle_h,  LEFT);
+        fill_rect(fb, right.x,right.y, paddle_w,paddle_h, RIGHT);
+        if (!winner) {
+            fill_rect(fb, ball.x>>8,ball.y>>8, ball_size,ball_size,  BALL);
+        }
+        draw_num(fb,                      30,10, score1,  LEFT);
         draw_num(fb, W-30-8*(score2>=10?2:1),10, score2, RIGHT);
+
         if (winner) {
+            for (int i = 0; i < len(particle); i++) {
+                struct particle const *p = particle+i;
+                int const x = p->x >> 8,
+                          y = p->y >> 8;
+                for (int dy=-1; dy<=1; dy++)
+                for (int dx=-1; dx<=1; dx++) {
+                    int const xx = x + dx;
+                    int const yy = y + dy;
+                    if ((unsigned)xx < W && (unsigned)yy < H) {
+                        set_pixel(fb, xx, yy, (uint8_t)p->color);
+                    }
+                }
+            }
             char const *msg = winner==1 ? "P1 WINS!" : "P2 WINS!";
             draw_str(fb, (W-8*7)/2, H/2-4, msg, winner==1 ? LEFT : RIGHT);
         }
