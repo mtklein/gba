@@ -102,7 +102,6 @@ static void draw_num(struct fb *fb, int x, int y, int v, uint8_t color) {
 
 // use built in fixed point type
 typedef _Accum fixed;
-static fixed to_fixed(int   n) { return (fixed)n; }
 
 
 static int const paddle_h     = 30,
@@ -156,8 +155,8 @@ void main(void) {
     struct paddle left  = {.x=           10, .y = (H - paddle_h)/2};
     struct paddle right = {.x=W-10-paddle_w, .y = (H - paddle_h)/2};
     struct ball ball = {
-        .x  = to_fixed(W/2 - ball_size/2),
-        .y  = to_fixed(H/2 - ball_size/2),
+        .x  = W/2 - ball_size/2,
+        .y  = H/2 - ball_size/2,
         .vx = -ball_speed,
         .vy = 0,
     };
@@ -167,8 +166,8 @@ void main(void) {
 
     for (int i = 0; i < len(particle); i++) {
         struct particle *p = particle+i;
-        p->x = to_fixed(W/2);
-        p->y = to_fixed(H/2);
+        p->x = W/2;
+        p->y = H/2;
         fixed const s = 0.75K;
         switch (i & 7) {
             case 0:  p->vx = +s;  p->vy =  0;  break;
@@ -229,7 +228,7 @@ void main(void) {
                   && bx <= left.x + paddle_w
                   && by <= left.y + paddle_h) {
                 int const offset = (by + ball_size/2) - (left.y + paddle_h/2);
-                ball.x  = to_fixed(left.x + paddle_w);
+                ball.x  = left.x + paddle_w;
                 ball.vx = +ball_speed;
                 ball.vy = (_Accum)offset >> 3;
             }
@@ -238,22 +237,22 @@ void main(void) {
                   && bx <= right.x + paddle_w
                   && by <= right.y + paddle_h) {
                 int const offset = (by + ball_size/2) - (right.y + paddle_h/2);
-                ball.x  = to_fixed(right.x - ball_size);
+                ball.x  = right.x - ball_size;
                 ball.vx = -ball_speed;
                 ball.vy = (_Accum)offset >> 3;
             }
 
             if (bx < 0) {
                 score2++;
-                ball.x  = to_fixed(W/2);
-                ball.y  = to_fixed(H/2);
+                ball.x  = W/2;
+                ball.y  = H/2;
                 ball.vx = +ball_speed;
                 ball.vy = 0;
             }
             if (bx > W - ball_size) {
                 score1++;
-                ball.x  = to_fixed(W/2);
-                ball.y  = to_fixed(H/2);
+                ball.x  = W/2;
+                ball.y  = H/2;
                 ball.vx = -ball_speed;
                 ball.vy = 0;
             }
