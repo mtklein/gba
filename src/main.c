@@ -102,7 +102,6 @@ static void draw_num(struct fb *fb, int x, int y, int v, uint8_t color) {
 
 // use built in fixed point type
 typedef _Accum fixed;
-static int   int_part(fixed f) { return (int)f; }
 static fixed to_fixed(int   n) { return (fixed)n; }
 
 
@@ -219,8 +218,8 @@ void main(void) {
             ball.x += ball.vx;
             ball.y += ball.vy;
 
-            int const bx = int_part(ball.x),
-                      by = int_part(ball.y);
+            int const bx = ball.x,
+                      by = ball.y;
 
             if (by <= 0           && ball.vy < 0) { ball.vy = -ball.vy; }
             if (by >= H-ball_size && ball.vy > 0) { ball.vy = -ball.vy; }
@@ -269,7 +268,7 @@ void main(void) {
         fill_rect(fb,  left.x, left.y, paddle_w,paddle_h,  LEFT);
         fill_rect(fb, right.x,right.y, paddle_w,paddle_h, RIGHT);
         if (!winner) {
-            fill_rect(fb, int_part(ball.x),int_part(ball.y), ball_size,ball_size,  BALL);
+            fill_rect(fb, ball.x,ball.y, ball_size,ball_size,  BALL);
         }
         draw_num(fb,                      30,10, score1,  LEFT);
         draw_num(fb, W-30-8*(score2>=10?2:1),10, score2, RIGHT);
@@ -277,8 +276,8 @@ void main(void) {
         if (winner) {
             for (int i = 0; i < len(particle); i++) {
                 struct particle const *p = particle+i;
-                int const x = int_part(p->x),
-                          y = int_part(p->y);
+                int const x = p->x,
+                          y = p->y;
                 fill_rect(fb, x-1,y-1, 3,3, (uint8_t)p->color);
             }
             char const *msg = winner==1 ? "P1 WINS!" : "P2 WINS!";
