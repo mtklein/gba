@@ -46,14 +46,12 @@ static struct fb* vsync_swap(void) {
 
 static inline void set_pixel(struct fb *fb, int x, int y, uint8_t color) {
     if ((unsigned)x < W && (unsigned)y < H) {
-        int const ix = y * (W/2) + x/2;
-        struct fb px = fb[ix];
+        struct fb *px = fb + y * (W/2) + x/2;
         if (x & 1) {
-            px.hi = color;
+            px->hi = color;
         } else {
-            px.lo = color;
+            px->lo = color;
         }
-        fb[ix] = px;
     }
 }
 
