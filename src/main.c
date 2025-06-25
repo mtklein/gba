@@ -127,6 +127,72 @@ static union rgb555 const cool_color[] = {
     {.r=10, .g=10, .b=20},
 };
 
+struct particle { int x, y, vx, vy, life, color; }; // .8 fixed pixels
+
+static union rgb555 const fire_color[] = {
+    {.r=31, .g= 0, .b= 0},
+    {.r=31, .g=31, .b= 0},
+    {.r= 0, .g=31, .b= 0},
+    {.r= 0, .g=31, .b=31},
+    {.r= 0, .g= 0, .b=31},
+    {.r=31, .g= 0, .b=31},
+    {.r=31, .g=15, .b= 0},
+    {.r=15, .g= 0, .b=31},
+};
+
+enum { FIRE_START = 4, NUM_FIRE_COLORS = len(fire_color) };
+#define N_PARTICLES 32
+static struct particle particles[N_PARTICLES];
+static int fireworks = 0;
+
+static void firework_start(void) {
+    for (int i = 0; i < N_PARTICLES; i++) {
+        struct particle *p = &particles[i];
+        p->x = (W/2) << 8;
+        p->y = (H/2) << 8;
+        int const s = 192;
+        switch (i & 7) {
+            case 0:  p->vx = +s;  p->vy = 0;   break;
+            case 1:  p->vx = +s;  p->vy = -s;  break;
+            case 2:  p->vx = 0;   p->vy = -s;  break;
+            case 3:  p->vx = -s;  p->vy = -s;  break;
+            case 4:  p->vx = -s;  p->vy = 0;   break;
+            case 5:  p->vx = -s;  p->vy = +s;  break;
+            case 6:  p->vx = 0;   p->vy = +s;  break;
+            default: p->vx = +s;  p->vy = +s;  break;
+        }
+        p->life = 60;
+        p->color = FIRE_START + i % NUM_FIRE_COLORS;
+    }
+    fireworks = 1;
+}
+
+static void firework_update(void) {
+    for (int i = 0; i < N_PARTICLES; i++) {
+        struct particle *p = &particles[i];
+        if (p->life <= 0) continue;
+        p->x += p->vx;
+        p->y += p->vy;
+        p->vy += 8;
+        p->life--;
+    }
+}
+
+static void firework_draw(uint16_t *fb) {
+    for (int i = 0; i < N_PARTICLES; i++) {
+        struct particle const *p = &particles[i];
+        if (p->life <= 0) continue;
+        int const x = p->x >> 8;
+        int const y = p->y >> 8;
+        if ((unsigned)x < W && (unsigned)y < H) {
+            set_pixel(fb, x, y, (uint8_t)p->color);
+            if ((unsigned)(x+1) < W) set_pixel(fb, x+1, y, (uint8_t)p->color);
+            if ((unsigned)(y+1) < H) set_pixel(fb, x, y+1, (uint8_t)p->color);
+            if ((unsigned)(x+1) < W && (unsigned)(y+1) < H) set_pixel(fb, x+1, y+1, (uint8_t)p->color);
+        }
+    }
+}
+
 void main(void) {
     *reg_dispcnt = 4 | (1<<10);
 
@@ -135,6 +201,9 @@ void main(void) {
     palette[BALL ] = ((union rgb555){.r=0, .g=0, .b=0 }).rgbx;
     palette[LEFT ] = warm_color->rgbx;
     palette[RIGHT] = cool_color->rgbx;
+    for (int i = 0; i < NUM_FIRE_COLORS; i++) {
+        palette[FIRE_START + i] = fire_color[i].rgbx;
+    }
 
     clear(front_fb, BG);
     clear( back_fb, BG);
@@ -219,6 +288,9 @@ void main(void) {
             if ((score1 >= 11 || score2 >= 11) && (diff >= 2 || diff <= -2)) {
                 winner = diff > 0 ? 1 : 2;
             }
+        } else {
+            if (!fireworks) firework_start();
+            firework_update();
         }
 
         clear(fb, BG);
@@ -230,6 +302,7 @@ void main(void) {
         if (winner) {
             char const *msg = winner==1 ? "P1 WINS!" : "P2 WINS!";
             draw_str(fb, (W-8*7)/2, H/2-4, msg, winner==1 ? LEFT : RIGHT);
+            firework_draw(fb);
         }
     }
 }
