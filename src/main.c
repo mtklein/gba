@@ -100,20 +100,16 @@ static void draw_num(struct fb *fb, int x, int y, int v, uint8_t color) {
     draw_char(fb, x, y, (char)('0' + v), color);
 }
 
-// use built in fixed point type
-typedef _Accum fixed;
-
-
 static int const paddle_h     = 30,
                  paddle_w     = 4,
                  paddle_speed = 3,
                  ball_size    = 4;
 
-static fixed const ball_speed = 1.5K;
+static _Accum const ball_speed = 1.5K;
 
 struct paddle   { int x,y; };
-struct ball     { fixed x,y,vx,vy; };
-struct particle { fixed x,y,vx,vy; int color; };
+struct ball     { _Accum x,y,vx,vy; };
+struct particle { _Accum x,y,vx,vy; int color; };
 
 static struct rgb555 const warm_color[] = {
     {.r=31, .g= 0, .b= 0},
@@ -168,7 +164,7 @@ void main(void) {
         struct particle *p = particle+i;
         p->x = W/2;
         p->y = H/2;
-        fixed const s = 0.75K;
+        _Accum const s = 0.75K;
         switch (i & 7) {
             case 0:  p->vx = +s;  p->vy =  0;  break;
             case 1:  p->vx = +s;  p->vy = -s;  break;
