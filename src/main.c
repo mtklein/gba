@@ -18,7 +18,14 @@ static _Accum const paddle_h  = 30,
 struct entity;
 typedef void draw_fn(struct entity const*, struct fb *fb, int winner);
 
-struct entity { _Accum x,y,vx,vy,ax,ay; uint8_t color; uint8_t pad[3]; draw_fn *draw; };
+enum {PADDLE,BALL,PARTICLE};
+struct entity {
+    char const type;
+    uint8_t    color;
+    short      padding;
+    _Accum x,y,vx,vy,ax,ay;
+    draw_fn *draw;
+};
 
 static void draw_paddle(struct entity const *p, struct fb *fb, int winner) {
     (void)winner;
@@ -42,10 +49,10 @@ void main(void) {
 
     struct rgb555 *color = palette;
 
-    uint8_t const BG = (uint8_t)(color - palette);
+    uint8_t const WHITE = (uint8_t)(color - palette);
     *color++ = (struct rgb555){.r=31,.g=31,.b=31};
 
-    uint8_t const BALL = (uint8_t)(color - palette);
+    uint8_t const BLACK = (uint8_t)(color - palette);
     *color++ = (struct rgb555){.r=0, .g=0, .b=0};
 
     uint8_t const WARM = (uint8_t)(color - palette);
@@ -62,7 +69,7 @@ void main(void) {
     *color++ = (struct rgb555){.r=10, .g=10, .b=20};
     int const wrap_cool = (int)(color - palette) - COOL - 1;
 
-    uint8_t const PARTICLE = (uint8_t)(color - palette);
+    uint8_t const PARTICLE_COLOR = (uint8_t)(color - palette);
     *color++ = (struct rgb555){.r=31, .g= 0, .b= 0};
     *color++ = (struct rgb555){.r=31, .g=31, .b= 0};
     *color++ = (struct rgb555){.r= 0, .g=31, .b= 0};
@@ -71,48 +78,52 @@ void main(void) {
     *color++ = (struct rgb555){.r=31, .g= 0, .b=31};
     *color++ = (struct rgb555){.r=31, .g=15, .b= 0};
     *color++ = (struct rgb555){.r=15, .g= 0, .b=31};
-    int const wrap_particle = (int)(color - palette) - PARTICLE - 1;
+    int const wrap_particle = (int)(color - palette) - PARTICLE_COLOR - 1;
 
     struct entity e[] = {
         {
+            .type  = PADDLE,
             .x     = 10,
             .y     = (H - paddle_h)/2,
             .draw  = draw_paddle,
             .color = WARM,
         },
         {
+            .type  = PADDLE,
             .x     = W-10-paddle_w,
             .y     = (H - paddle_h)/2,
             .draw  = draw_paddle,
             .color = COOL,
         },
         {
+            .type  = BALL,
             .x     = W/2 - ball_size/2,
             .y     = H/2 - ball_size/2,
             .vx    = -1.5K,
             .ay    = 1/256.0K,
             .draw  = draw_ball,
-            .color = BALL,
+            .color = BLACK,
         },
         {
+            .type  = BALL,
             .x     = W/2 - ball_size/2,
             .y     = H/2 - ball_size/2,
             .vx    = +1.5K,
             .ay    = 1/256.0K,
             .draw  = draw_ball,
-            .color = BALL,
+            .color = BLACK,
         },
-        {.x=W/2, .y=H/2, .draw=draw_particle},
-        {.x=W/2, .y=H/2, .draw=draw_particle},
-        {.x=W/2, .y=H/2, .draw=draw_particle},
+        {.type=PARTICLE, .x=W/2, .y=H/2},
+        {.type=PARTICLE, .x=W/2, .y=H/2},
+        {.type=PARTICLE, .x=W/2, .y=H/2},
 
-        {.x=W/2, .y=H/2, .draw=draw_particle},
-        {.x=W/2, .y=H/2, .draw=draw_particle},
-        {.x=W/2, .y=H/2, .draw=draw_particle},
+        {.type=PARTICLE, .x=W/2, .y=H/2},
+        {.type=PARTICLE, .x=W/2, .y=H/2},
+        {.type=PARTICLE, .x=W/2, .y=H/2},
 
-        {.x=W/2, .y=H/2, .draw=draw_particle},
-        {.x=W/2, .y=H/2, .draw=draw_particle},
-        {.x=W/2, .y=H/2, .draw=draw_particle},
+        {.type=PARTICLE, .x=W/2, .y=H/2},
+        {.type=PARTICLE, .x=W/2, .y=H/2},
+        {.type=PARTICLE, .x=W/2, .y=H/2},
     };
 
     struct entity *left  = e+0,
@@ -143,6 +154,11 @@ void main(void) {
         if ((keys & (1<<3)) && !(held & (1<<3))) {
             right->color = (uint8_t)(COOL + (++next_cool_color & wrap_cool));
         }
+        for (int i = 0; i < len(e); i++) {
+            if (e[i].type == PARTICLE) {
+                e[i].color = (uint8_t)(PARTICLE_COLOR + (++next_particle_color & wrap_particle));
+            }
+        }
 
         for (int i = 0; i < len(e); i++) {
             e[i].x += e[i].vx;
@@ -150,17 +166,13 @@ void main(void) {
 
             e[i].vx += e[i].ax;
             e[i].vy += e[i].ay;
-
-            if (e[i].draw == draw_particle) {
-                e[i].color = (uint8_t)(PARTICLE + (++next_particle_color & wrap_particle));
-            }
         }
 
         left ->y = clamp( left->y, 0, H-paddle_h);
         right->y = clamp(right->y, 0, H-paddle_h);
 
         for (int i = 0; i < len(e); i++) {
-            if (e[i].draw != draw_ball) {
+            if (e[i].type != BALL) {
                 continue;
             }
             struct entity *ball = e+i;
@@ -206,31 +218,39 @@ void main(void) {
             winner = diff > 0 ? 1 : 2;
 
             for (int i = 0; i < len(e); i++) {
-                if (e[i].draw == draw_ball) {
-                    struct entity *ball = e+i;
-                    ball->vx = ball->vy = ball->ax = ball->ay = 0;
-                }
-                if (e[i].draw == draw_particle) {
-                    struct entity *p = e+i;
-                    _Accum const s = 0.75K;
-                    switch (i & 7) {
-                        case 0:  p->vx = +s;  p->vy =  0; break;
-                        case 1:  p->vx = +s;  p->vy = -s; break;
-                        case 2:  p->vx =  0;  p->vy = -s; break;
-                        case 3:  p->vx = -s;  p->vy = -s; break;
-                        case 4:  p->vx = -s;  p->vy =  0; break;
-                        case 5:  p->vx = -s;  p->vy = +s; break;
-                        case 6:  p->vx =  0;  p->vy = +s; break;
-                        default: p->vx = +s;  p->vy = +s; break;
-                    }
-                    p->ay = 1/256.0K;
+                switch (e[i].type) {
+                    case PADDLE:
+                        break;
+
+                    case BALL:
+                        e[i].draw = 0;
+                        e[i].vx = e[i].vy = e[i].ax = e[i].ay = 0;
+                        break;
+
+                    case PARTICLE:
+                        e[i].draw = draw_particle;
+                        _Accum const s = 0.75K;
+                        switch (i & 7) {
+                            case 0:  e[i].vx = +s;  e[i].vy =  0; break;
+                            case 1:  e[i].vx = +s;  e[i].vy = -s; break;
+                            case 2:  e[i].vx =  0;  e[i].vy = -s; break;
+                            case 3:  e[i].vx = -s;  e[i].vy = -s; break;
+                            case 4:  e[i].vx = -s;  e[i].vy =  0; break;
+                            case 5:  e[i].vx = -s;  e[i].vy = +s; break;
+                            case 6:  e[i].vx =  0;  e[i].vy = +s; break;
+                            case 7: e[i].vx = +s;  e[i].vy = +s; break;
+                        }
+                        e[i].ay = 1/256.0K;
+                        break;
                 }
             }
         }
 
-        clear(fb, BG);
+        clear(fb, WHITE);
         for (int i = 0; i < len(e); i++) {
-            e[i].draw(e+i, fb, winner);
+            if (e[i].draw) {
+                e[i].draw(e+i, fb, winner);
+            }
         }
         draw_num(fb,  left->color,                      30,10, score1);
         draw_num(fb, right->color, W-30-8*(score2>=10?2:1),10, score2);

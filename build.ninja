@@ -8,7 +8,10 @@ rule assemble
 
 rule compile
   command = PATH=$path $cc -c $in -o $out -Os -ffixed-point -ffreestanding -fcolor-diagnostics $
-            -Werror -Weverything -Wno-declaration-after-statement -Wno-unsafe-buffer-usage
+            -Werror -Weverything $
+            -Wno-declaration-after-statement $
+            -Wno-switch-default $
+            -Wno-unsafe-buffer-usage
 rule link
   command = PATH=$path ld.lld -T src/linker.ld --oformat=binary $in -o $out
 
