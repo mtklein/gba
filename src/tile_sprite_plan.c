@@ -33,7 +33,7 @@ incrementally.
    - Design a 4bpp tile (or small tile set) for a paddle.
    - For each paddle entity update its OAM attributes instead of drawing a
      rectangle each frame.
-   - Confirm movement and color cycling work with sprites.
+   - Confirm movement works with sprites.
 
 6. **Convert the Ball to a Sprite**
    - Create tile graphics for the ball.
@@ -59,4 +59,9 @@ Local Testing Instructions
 -------------------------
 - Run `ninja` to build `hello.gba` after applying each step above.
 - Test the ROM in an emulator (for example `mgba hello.gba`) to verify behavior.
+
+Follow Up
+---------
+- After completing the refactor, reintroduce paddle color cycling by updating
+  palette entries each frame.
 */

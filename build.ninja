@@ -18,5 +18,4 @@ rule link
 build out/gba_header.o: assemble src/gba_header.s
 build out/crt0.o:       assemble src/crt0.s
 build out/main.o:       compile  src/main.c
-build out/draw.o:       compile  src/draw.c
-build hello.gba:        link     out/gba_header.o out/crt0.o out/main.o out/draw.o
+build hello.gba:        link     out/gba_header.o out/crt0.o out/main.o
