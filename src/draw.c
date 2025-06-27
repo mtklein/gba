@@ -14,17 +14,23 @@ static struct DMA volatile *dma = (struct DMA volatile*)0x040000B0;
 
 struct rgb555 *palette = (struct rgb555*)0x05000000;
 
-static void font_to_tile(uint8_t *dst, const uint8_t src[8]) {
-    /* Convert an 8x8 1bpp glyph into a 4bpp tile.  In GBA tile format the
-       low nibble of each byte is the left pixel and the high nibble is the
-       right pixel. */
+static void font_to_tile(uint16_t *dst, const uint8_t src[8]) {
+    /*
+       Convert an 8x8 1bpp glyph into a 4bpp tile.  VRAM must be written
+       using halfword accesses, so we compose each row as two uint16_t words
+       before storing them.
+
+       Each tile row holds eight pixels.  The lower nibble of a word is the
+       leftmost pixel and the upper nibble is the next pixel to the right.
+    */
     for (int r = 0; r < 8; r++) {
         uint8_t bits = src[r];
-        for (int c = 0; c < 8; c += 2) {
-            uint8_t left  = (bits & (1 << (7 - c)))     ? 1 : 0;
-            uint8_t right = (bits & (1 << (7 - (c+1)))) ? 1 : 0;
-            *dst++ = (uint8_t)((right << 4) | left);
+        uint8_t n[8];
+        for (int c = 0; c < 8; c++) {
+            n[c] = (bits & (1 << (7 - c))) ? 1 : 0;
         }
+        dst[r*2 + 0] = (uint16_t)(n[0] | (n[1] << 4) | (n[2] << 8) | (n[3] << 12));
+        dst[r*2 + 1] = (uint16_t)(n[4] | (n[5] << 4) | (n[6] << 8) | (n[7] << 12));
     }
 }
 
@@ -52,7 +58,7 @@ void draw_init(void) {
 
     char digits[] = "0123456789";
     for (int i = 0; i < 10; i++) {
-        font_to_tile((uint8_t*)tilemem + (i+1)*32, font_get(digits[i]));
+        font_to_tile(tilemem + (i+1)*16, font_get(digits[i]));
     }
 
     /* place digits on the first row of the map */
