@@ -15,12 +15,15 @@ static struct DMA volatile *dma = (struct DMA volatile*)0x040000B0;
 struct rgb555 *palette = (struct rgb555*)0x05000000;
 
 static void font_to_tile(uint8_t *dst, const uint8_t src[8]) {
+    /* Convert an 8x8 1bpp glyph into a 4bpp tile.  In GBA tile format the
+       low nibble of each byte is the left pixel and the high nibble is the
+       right pixel. */
     for (int r = 0; r < 8; r++) {
         uint8_t bits = src[r];
         for (int c = 0; c < 8; c += 2) {
-            uint8_t hi = (bits & (1 << (7 - c))) ? 1 : 0;
-            uint8_t lo = (bits & (1 << (7 - (c+1)))) ? 1 : 0;
-            *dst++ = (uint8_t)((hi << 4) | lo);
+            uint8_t left  = (bits & (1 << (7 - c)))     ? 1 : 0;
+            uint8_t right = (bits & (1 << (7 - (c+1)))) ? 1 : 0;
+            *dst++ = (uint8_t)((right << 4) | left);
         }
     }
 }
