@@ -126,8 +126,13 @@ static void vsync(void) {
     while (*reg_vcount <  H);
 }
 
+static uint32_t rand_lcg(uint32_t x) {
+    return x * 1664525u + 1013904223u;
+}
+
 __attribute__((noreturn))
 void main(void) {
+    unsigned frame = 0;
     *reg_dispcnt = (struct dispcnt){
         .obj_vram_mapping = 1,
         .enable_bg0       = 1,
@@ -284,18 +289,14 @@ void main(void) {
             int const diff = score_l - score_r;
             if ((score_l>=11 || score_r>=11) && (diff>=2 || diff<=-2)) {
                 winner = diff>0 ? 1 : 2;
+                uint32_t rng = frame;
+                _Accum const s = 0.75K;
+                _Accum const scale = s / 32768.0K;
                 for (int i = 0; i < len(stars); i++) {
-                    _Accum const s = 0.75K;
-                    switch (i & 7) {
-                        case 0:  stars[i].vx = +s;  stars[i].vy =  0;  break;
-                        case 1:  stars[i].vx = +s;  stars[i].vy = -s; break;
-                        case 2:  stars[i].vx =  0;  stars[i].vy = -s; break;
-                        case 3:  stars[i].vx = -s;  stars[i].vy = -s; break;
-                        case 4:  stars[i].vx = -s;  stars[i].vy =  0;  break;
-                        case 5:  stars[i].vx = -s;  stars[i].vy = +s; break;
-                        case 6:  stars[i].vx =  0;  stars[i].vy = +s; break;
-                        default: stars[i].vx = +s;  stars[i].vy = +s; break;
-                    }
+                    rng = rand_lcg(rng);
+                    stars[i].vx = (int16_t)(rng >> 16) * scale;
+                    rng = rand_lcg(rng);
+                    stars[i].vy = (int16_t)(rng >> 16) * scale;
                 }
             }
         }
@@ -325,6 +326,7 @@ void main(void) {
         }
 
         vsync();
+        frame++;
 
         for (int i = 0; i < len(sprite); i++) {
             oam[i].attr0 = sprite[i].attr0;
