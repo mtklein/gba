@@ -79,9 +79,9 @@ void draw_init(void) {
     uint16_t *tilemem  = (uint16_t*)0x06000000;
     uint16_t *mapmem   = (uint16_t*)0x0600F800;
 
-    /* Step 2 demo tile filled with palette index 1 */
+    /* Step 2 demo tile filled with palette index 0 (white background) */
     for (int i = 0; i < 16; i++) {
-        tilemem[i] = 0x1111;
+        tilemem[i] = 0x0000;
     }
     for (int i = 0; i < 32*32; i++) {
         mapmem[i] = 0;
