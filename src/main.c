@@ -109,12 +109,13 @@ void main(void) {
         obj_tiles[2*16 + i] = ball_tile[i];
     }
 
-    int left_y  = (H-16)/2;
-    int right_y = (H-16)/2;
-    int ball_x  = (W-8)/2;
-    int ball_y  = (H-8)/2;
-    int ball_vx = 2;
-    int ball_vy = 1;
+    int    left_y  = (H-16)/2;
+    int    right_y = (H-16)/2;
+    _Accum ball_x  = (W-8)/2;
+    _Accum ball_y  = (H-8)/2;
+    _Accum ball_vx = 1.5K;
+    _Accum ball_vy = 0;
+    _Accum ball_ay = 1/256.0K;
     int score_l = 0;
     int score_r = 0;
     int winner  = 0;
@@ -134,32 +135,35 @@ void main(void) {
         if (right_y > H-16)  right_y = H-16;
 
         if (!winner) {
-            ball_x += ball_vx;
-            ball_y += ball_vy;
-            if (ball_y <= 0 || ball_y >= H-8) ball_vy = -ball_vy;
+            ball_vy += ball_ay;
+            ball_x  += ball_vx;
+            ball_y  += ball_vy;
 
-            if (ball_x <= 10+8 && ball_x+8 >= 10 &&
-                ball_y+8 >= left_y && ball_y <= left_y+16 && ball_vx < 0) {
+            int const bx = (int)ball_x,
+                      by = (int)ball_y;
+
+            if (by <= 0 || by >= H-8) ball_vy = -ball_vy;
+
+            if (bx <= 10+8 && bx+8 >= 10 &&
+                by+8 >= left_y && by <= left_y+16 && ball_vx < 0) {
                 ball_vx = -ball_vx;
             }
 
-            if (ball_x+8 >= W-10-8 && ball_x <= W-10-8+8 &&
-                ball_y+8 >= right_y && ball_y <= right_y+16 && ball_vx > 0) {
+            if (bx+8 >= W-10-8 && bx <= W-10-8+8 &&
+                by+8 >= right_y && by <= right_y+16 && ball_vx > 0) {
                 ball_vx = -ball_vx;
             }
 
-            if (ball_x < 0) {
+            if (bx < 0) {
                 score_r++;
                 ball_x = (W-8)/2;
                 ball_y = (H-8)/2;
-                ball_vx = 2;
-                ball_vy = 1;
-            } else if (ball_x > W-8) {
+                ball_vx = -ball_vx;
+            } else if (bx > W-8) {
                 score_l++;
                 ball_x = (W-8)/2;
                 ball_y = (H-8)/2;
-                ball_vx = -2;
-                ball_vy = 1;
+                ball_vx = -ball_vx;
             }
 
             int const diff = score_l - score_r;
@@ -180,8 +184,8 @@ void main(void) {
                 .attr2 = 0 | (1<<12),              /* palbank 1 */
             },
             {
-                .attr0 = (ball_y & 0xFF) | (winner ? disable : 0),
-                .attr1 = ball_x & 0x1FF,
+                .attr0 = ((int)ball_y & 0xFF) | (winner ? disable : 0),
+                .attr1 = (int)ball_x & 0x1FF,
                 .attr2 = 2 | (0<<12),             /* tile 2, palbank 0 */
             },
         };
