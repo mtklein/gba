@@ -93,7 +93,7 @@ void main(void) {
         oam[i].sprite.attr0 = disable;
     }
 
-    for (int t = 0; t < 2; t++) {
+    for (int t = 0; t < 4; t++) {
         for (int i = 0; i < 16; i++) {
             obj_tiles[t*16 + i] = 0x1111;
         }
@@ -106,11 +106,11 @@ void main(void) {
         0x2220,0x0222, 0x2200,0x0022,
     };
     for (int i = 0; i < 16; i++) {
-        obj_tiles[2*16 + i] = ball_tile[i];
+        obj_tiles[4*16 + i] = ball_tile[i];
     }
 
-    int    left_y  = (H-16)/2;
-    int    right_y = (H-16)/2;
+    int    left_y  = (H-32)/2;
+    int    right_y = (H-32)/2;
     _Accum ball_x  = (W-8)/2;
     _Accum ball_y  = (H-8)/2;
     _Accum ball_vx = 1.5K;
@@ -130,9 +130,9 @@ void main(void) {
         }
 
         if (left_y  < 0)     left_y  = 0;
-        if (left_y  > H-16)  left_y  = H-16;
+        if (left_y  > H-32)  left_y  = H-32;
         if (right_y < 0)     right_y = 0;
-        if (right_y > H-16)  right_y = H-16;
+        if (right_y > H-32)  right_y = H-32;
 
         if (!winner) {
             ball_vy += ball_ay;
@@ -145,13 +145,17 @@ void main(void) {
             if (by <= 0 || by >= H-8) ball_vy = -ball_vy;
 
             if (bx <= 10+8 && bx+8 >= 10 &&
-                by+8 >= left_y && by <= left_y+16 && ball_vx < 0) {
+                by+8 >= left_y && by <= left_y+32 && ball_vx < 0) {
+                int const offset = (by + 4) - (left_y + 16);
                 ball_vx = -ball_vx;
+                ball_vy = offset >> 3;
             }
 
             if (bx+8 >= W-10-8 && bx <= W-10-8+8 &&
-                by+8 >= right_y && by <= right_y+16 && ball_vx > 0) {
+                by+8 >= right_y && by <= right_y+32 && ball_vx > 0) {
+                int const offset = (by + 4) - (right_y + 16);
                 ball_vx = -ball_vx;
+                ball_vy = offset >> 3;
             }
 
             if (bx < 0) {
@@ -159,11 +163,13 @@ void main(void) {
                 ball_x = (W-8)/2;
                 ball_y = (H-8)/2;
                 ball_vx = -ball_vx;
+                ball_vy = 0;
             } else if (bx > W-8) {
                 score_l++;
                 ball_x = (W-8)/2;
                 ball_y = (H-8)/2;
                 ball_vx = -ball_vx;
+                ball_vy = 0;
             }
 
             int const diff = score_l - score_r;
@@ -175,18 +181,18 @@ void main(void) {
         struct sprite sprite[] = {
             {
                 .attr0 = (left_y & 0xFF) | 0x8000, /* tall */
-                .attr1 = 10 & 0x1FF,               /* x */
+                .attr1 = (10 & 0x1FF) | 0x4000,               /* x */
                 .attr2 = 0 | (0<<12),              /* tile 0, palbank 0 */
             },
             {
                 .attr0 = (right_y & 0xFF) | 0x8000,
-                .attr1 = (W-10-8) & 0x1FF,
+                .attr1 = ((W-10-8) & 0x1FF) | 0x4000,
                 .attr2 = 0 | (1<<12),              /* palbank 1 */
             },
             {
                 .attr0 = ((int)ball_y & 0xFF) | (winner ? disable : 0),
                 .attr1 = (int)ball_x & 0x1FF,
-                .attr2 = 2 | (0<<12),             /* tile 2, palbank 0 */
+                .attr2 = 4 | (0<<12),             /* tile 4, palbank 0 */
             },
         };
 
