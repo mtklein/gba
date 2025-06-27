@@ -52,6 +52,13 @@ static uint16_t volatile *const bg_tiles  = (uint16_t*)0x06000000,
                          *const bg_map    = (uint16_t*)0x0600F800,
                          *const obj_tiles = (uint16_t*)0x06010000;
 
+static struct rgb555 const warm_colors[] = {
+    {31, 0, 0}, {31,10, 0}, {31,20, 0}, {31,31, 0},
+};
+static struct rgb555 const cool_colors[] = {
+    { 0, 0,31}, { 0,31,31}, { 0,31, 0}, {10,10,31},
+};
+
 struct oam {
     struct {
         uint16_t y       :  8;
@@ -124,9 +131,12 @@ void main(void) {
     bg_palette[1] = (struct rgb555){ 0, 0, 0};
 
     obj_palette[ 0] = (struct rgb555){31,31,31};
-    obj_palette[ 1] = (struct rgb555){31, 0, 0};
+    int warm_idx = 0, cool_idx = 0;
+    uint16_t old_keys = 0;
+
+    obj_palette[ 1] = warm_colors[warm_idx];
     obj_palette[ 2] = (struct rgb555){ 0,31, 0};
-    obj_palette[17] = (struct rgb555){ 0, 0,31};
+    obj_palette[17] = cool_colors[cool_idx];
 
     for (int ch = 32; ch < 127; ch++) {
         font_to_tile(bg_tiles + (ch-32+1)*16, font_get((char)ch));
@@ -166,6 +176,18 @@ void main(void) {
 
     for (;;) {
         uint16_t keys = ~*reg_keys;
+        uint16_t pressed = keys & (uint16_t)~old_keys;
+        old_keys = keys;
+
+        if (pressed & (1<<2)) {
+            warm_idx = (warm_idx + 1) % len(warm_colors);
+            obj_palette[1] = warm_colors[warm_idx];
+        }
+        if (pressed & (1<<3)) {
+            cool_idx = (cool_idx + 1) % len(cool_colors);
+            obj_palette[17] = cool_colors[cool_idx];
+        }
+
         if (keys & (1<<6)) { left_y  -= 2; }
         if (keys & (1<<7)) { left_y  += 2; }
         if (keys & (1<<0)) { right_y -= 2; }
