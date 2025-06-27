@@ -52,12 +52,16 @@ static void sprite_init(struct oam_entry shadow[128]) {
         shadow[i].pad   = 0;
     }
 
-    /* Two 8x8 tiles form an 8x16 paddle in OBJ VRAM (charblock 4) */
+    /* Two 8x8 tiles form an 8x16 paddle in OBJ VRAM (charblock 4).
+       A third tile is used for the ball. */
     uint16_t *obj_tiles = (uint16_t*)0x06010000;
     for (int t = 0; t < 2; t++) {
         for (int i = 0; i < 16; i++) {
             obj_tiles[t*16 + i] = 0x1111; /* palette index 1 */
         }
+    }
+    for (int i = 0; i < 16; i++) {
+        obj_tiles[2*16 + i] = 0x2222; /* palette index 2 */
     }
 }
 
@@ -207,12 +211,17 @@ void main(void) {
 
     obj_palette[0]  = palette[0];
     obj_palette[1]  = (struct rgb555){31,0,0,0};  /* left paddle */
+    obj_palette[2]  = (struct rgb555){0,31,0,0};  /* ball */
     obj_palette[17] = (struct rgb555){0,0,31,0};  /* right paddle (bank 1 index 1) */
 
     sprite_init(shadow_oam);
 
     int left_y  = (H-16)/2;
     int right_y = (H-16)/2;
+    int ball_x  = (W-8)/2;
+    int ball_y  = (H-8)/2;
+    int ball_vx = 2;
+    int ball_vy = 1;
 
     for (;;) {
         uint16_t keys = ~*reg_keys;
@@ -226,6 +235,21 @@ void main(void) {
         if (right_y < 0)     right_y = 0;
         if (right_y > H-16)  right_y = H-16;
 
+        ball_x += ball_vx;
+        ball_y += ball_vy;
+        if (ball_y <= 0 || ball_y >= H-8) ball_vy = -ball_vy;
+        if (ball_x <= 0 || ball_x >= W-8) ball_vx = -ball_vx;
+
+        if (ball_x <= 10+8 && ball_x+8 >= 10 &&
+            ball_y+8 >= left_y && ball_y <= left_y+16 && ball_vx < 0) {
+            ball_vx = -ball_vx;
+        }
+
+        if (ball_x+8 >= W-10-8 && ball_x <= W-10-8+8 &&
+            ball_y+8 >= right_y && ball_y <= right_y+16 && ball_vx > 0) {
+            ball_vx = -ball_vx;
+        }
+
         shadow_oam[0].attr0 = (left_y & 0xFF) | 0x8000; /* tall */
         shadow_oam[0].attr1 = 10 & 0x1FF;               /* x */
         shadow_oam[0].attr2 = 0 | (0<<12);              /* tile 0, palbank 0 */
@@ -233,6 +257,10 @@ void main(void) {
         shadow_oam[1].attr0 = (right_y & 0xFF) | 0x8000;
         shadow_oam[1].attr1 = (W-10-8) & 0x1FF;
         shadow_oam[1].attr2 = 0 | (1<<12);              /* palbank 1 */
+
+        shadow_oam[2].attr0 = ball_y & 0xFF;
+        shadow_oam[2].attr1 = ball_x & 0x1FF;
+        shadow_oam[2].attr2 = 2 | (0<<12);             /* tile 2, palbank 0 */
 
         vsync_swap(shadow_oam);
     }
