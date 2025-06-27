@@ -70,8 +70,9 @@ void draw_init(void) {
     /* Step 2: switch to tile background mode */
     uint16_t const mode0 = 0,
                      bg0  = 1<<8,
-                     obj  = 1<<12;
-    *reg_dispcnt = mode0 | bg0 | obj;
+                     obj  = 1<<12,
+                     obj_1d = 1<<6; /* use 1D sprite mapping */
+    *reg_dispcnt = mode0 | bg0 | obj | obj_1d;
 
     /* BG0: charblock 0, screenblock 31, 4bpp */
     *reg_bg0cnt = (0<<2) | (0<<7) | (31<<8);
