@@ -18,7 +18,7 @@ struct rgb555 *obj_palette  = (struct rgb555*)0x05000200;
 /* Step 4 sprite definitions */
 static volatile struct oam_entry *const oam =
     (volatile struct oam_entry*)0x07000000;
-static struct oam_entry shadow_oam[128];
+struct oam_entry shadow_oam[128];
 
 void sprite_init(void) {
     /* Hide all sprites */
@@ -29,16 +29,13 @@ void sprite_init(void) {
         shadow_oam[i].pad   = 0;
     }
 
-    /* Simple 8x8 square tile in OBJ VRAM (charblock 4) */
+    /* Two 8x8 tiles form an 8x16 paddle in OBJ VRAM (charblock 4) */
     uint16_t *obj_tiles = (uint16_t*)0x06010000;
-    for (int i = 0; i < 16; i++) {
-        obj_tiles[i] = 0x2222; /* palette index 2 */
+    for (int t = 0; t < 2; t++) {
+        for (int i = 0; i < 16; i++) {
+            obj_tiles[t*16 + i] = 0x1111; /* palette index 1 */
+        }
     }
-
-    /* Place one test sprite using this tile */
-    shadow_oam[0].attr0 = (100 & 0xFF) | 0x0000; /* y, 4bpp, square */
-    shadow_oam[0].attr1 = (120 & 0x1FF) | 0x4000; /* x, size 0 (8x8) */
-    shadow_oam[0].attr2 = 0; /* tile index 0 */
 }
 
 void sprite_flush(void) {

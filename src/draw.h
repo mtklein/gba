@@ -36,5 +36,7 @@ struct oam_entry {
     uint16_t pad;
 };
 
+extern struct oam_entry shadow_oam[128];
+
 void sprite_init(void);
 void sprite_flush(void);
