@@ -74,6 +74,14 @@ struct oam {
 };
 static struct oam volatile *const oam = (struct oam volatile*)0x07000000;
 
+struct particle {
+    _Accum x, y, vx, vy;
+    int palbank;
+};
+
+#define N_FIREWORKS 8
+
+
 static void font_to_tile(uint16_t volatile *tile, const uint8_t glyph[8]) {
     for (int r = 0; r < 8; r++) {
         uint8_t const bits = glyph[r];
@@ -153,6 +161,24 @@ void main(void) {
         obj_tiles[4*16 + i] = ball_tile[i];
     }
 
+    static const uint16_t firework_tile[] = {
+        0x1000,0x0001, 0x1100,0x0011,
+        0x1110,0x0111, 0x1111,0x1111,
+        0x1111,0x1111, 0x1110,0x0111,
+        0x1100,0x0011, 0x1000,0x0001,
+    };
+    for (int i = 0; i < 16; i++) {
+        obj_tiles[5*16 + i] = firework_tile[i];
+    }
+
+    static struct rgb555 const firework_color[] = {
+        {31, 0, 0}, {31,31, 0}, { 0,31, 0}, { 0,31,31},
+        { 0, 0,31}, {31, 0,31}, {31,15, 0}, {15, 0,31},
+    };
+    for (int i = 0; i < len(firework_color); i++) {
+        obj_palette[(2+i)*16 + 1] = firework_color[i];
+    }
+
     int    left_y  = (H-32)/2;
     int    right_y = (H-32)/2;
     _Accum ball_x  = (W-8)/2;
@@ -163,6 +189,8 @@ void main(void) {
     int score_l = 0;
     int score_r = 0;
     int winner  = 0;
+    struct particle fireworks[N_FIREWORKS];
+    int fireworks_active = 0;
 
     for (;;) {
         uint16_t keys = ~*reg_keys;
@@ -217,26 +245,59 @@ void main(void) {
             int const diff = score_l - score_r;
             if ((score_l>=11 || score_r>=11) && (diff>=2 || diff<=-2)) {
                 winner = diff>0 ? 1 : 2;
+                if (!fireworks_active) {
+                    fireworks_active = 1;
+                    _Accum const s = 0.75K;
+                    for (int i = 0; i < N_FIREWORKS; i++) {
+                        fireworks[i].x = (W-8)/2;
+                        fireworks[i].y = (H-8)/2;
+                        switch (i) {
+                            case 0:  fireworks[i].vx = +s;  fireworks[i].vy =  0; break;
+                            case 1:  fireworks[i].vx = +s;  fireworks[i].vy = -s; break;
+                            case 2:  fireworks[i].vx =  0;  fireworks[i].vy = -s; break;
+                            case 3:  fireworks[i].vx = -s;  fireworks[i].vy = -s; break;
+                            case 4:  fireworks[i].vx = -s;  fireworks[i].vy =  0; break;
+                            case 5:  fireworks[i].vx = -s;  fireworks[i].vy = +s; break;
+                            case 6:  fireworks[i].vx =  0;  fireworks[i].vy = +s; break;
+                            default: fireworks[i].vx = +s;  fireworks[i].vy = +s; break;
+                        }
+                        fireworks[i].palbank = 2 + i;
+                    }
+                }
             }
         }
 
-        struct oam sprite[] = {
-            {
-                .attr0 = { .y = (uint16_t)left_y, .shape = 2 },
-                .attr1 = { .x =               10, .size  = 1 },
-                .attr2 = { .tile = 0, .palbank = 0 },
-            },
-            {
-                .attr0 = { .y = (uint16_t) right_y, .shape = 2 },
-                .attr1 = { .x = (uint16_t)(W-10-8), .size  = 1 },
-                .attr2 = { .tile = 0, .palbank = 1 },
-            },
-            {
-                .attr0 = { .y = (uint16_t)ball_y, .shape = 0, .hide = (uint16_t)!!winner },
-                .attr1 = { .x = (uint16_t)ball_x, .size  = 0 },
-                .attr2 = { .tile = 4, .palbank = 0 },
-            },
+        if (fireworks_active) {
+            for (int i = 0; i < N_FIREWORKS; i++) {
+                fireworks[i].x += fireworks[i].vx;
+                fireworks[i].y += fireworks[i].vy;
+                fireworks[i].vy += 1/256.0K;
+            }
+        }
+
+        struct oam sprite[3 + N_FIREWORKS];
+        sprite[0] = (struct oam){
+            .attr0 = { .y = (uint16_t)left_y, .shape = 2 },
+            .attr1 = { .x = 10, .size = 1 },
+            .attr2 = { .tile = 0, .palbank = 0 },
         };
+        sprite[1] = (struct oam){
+            .attr0 = { .y = (uint16_t)right_y, .shape = 2 },
+            .attr1 = { .x = (uint16_t)(W-10-8), .size = 1 },
+            .attr2 = { .tile = 0, .palbank = 1 },
+        };
+        sprite[2] = (struct oam){
+            .attr0 = { .y = (uint16_t)ball_y, .shape = 0, .hide = (uint16_t)!!winner },
+            .attr1 = { .x = (uint16_t)ball_x, .size = 0 },
+            .attr2 = { .tile = 4, .palbank = 0 },
+        };
+        for (int i = 0; i < N_FIREWORKS; i++) {
+            sprite[3+i] = (struct oam){
+                .attr0 = { .y = (uint16_t)fireworks[i].y, .shape = 0, .hide = (uint16_t)!fireworks_active },
+                .attr1 = { .x = (uint16_t)fireworks[i].x, .size = 0 },
+                .attr2 = { .tile = 5, .palbank = (uint16_t)fireworks[i].palbank },
+            };
+        }
 
         vsync();
 
