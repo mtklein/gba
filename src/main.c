@@ -153,8 +153,8 @@ void main(void) {
         obj_tiles[4*16 + i] = ball_tile[i];
     }
 
-    int    left_y  = (H-32)/2;
-    int    right_y = (H-32)/2;
+    _Accum left_y  = (H-32)/2;
+    _Accum right_y = (H-32)/2;
     _Accum ball_x  = (W-8)/2;
     _Accum ball_y  = (H-8)/2;
     _Accum ball_vx = 1.5K;
@@ -222,18 +222,18 @@ void main(void) {
 
         struct oam sprite[] = {
             {
-                .attr0 = { .y = (uint16_t)left_y, .shape = 2 },
-                .attr1 = { .x =               10, .size  = 1 },
+                .attr0 = { .y = left_y, .shape = 2 },
+                .attr1 = { .x =     10, .size  = 1 },
                 .attr2 = { .tile = 0, .palbank = 0 },
             },
             {
-                .attr0 = { .y = (uint16_t) right_y, .shape = 2 },
-                .attr1 = { .x = (uint16_t)(W-10-8), .size  = 1 },
+                .attr0 = { .y =  right_y, .shape = 2 },
+                .attr1 = { .x = (W-10-8), .size  = 1 },
                 .attr2 = { .tile = 0, .palbank = 1 },
             },
             {
-                .attr0 = { .y = (uint16_t)ball_y, .shape = 0, .hide = (uint16_t)!!winner },
-                .attr1 = { .x = (uint16_t)ball_x, .size  = 0 },
+                .attr0 = { .y = ball_y, .shape = 0, .hide = !!winner },
+                .attr1 = { .x = ball_x, .size  = 0 },
                 .attr2 = { .tile = 4, .palbank = 0 },
             },
         };
