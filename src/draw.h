@@ -26,3 +26,14 @@ void fill_rect(struct fb*, uint8_t color, int x, int y, int w, int h);
 void draw_char(struct fb*, uint8_t color, int x, int y, char);
 void draw_str (struct fb*, uint8_t color, int x, int y, char const[]);
 void draw_num (struct fb*, uint8_t color, int x, int y, int);
+
+/* Step 4: basic sprite support */
+struct oam_entry {
+    uint16_t attr0;
+    uint16_t attr1;
+    uint16_t attr2;
+    uint16_t pad;
+};
+
+void sprite_init(void);
+void sprite_flush(void);

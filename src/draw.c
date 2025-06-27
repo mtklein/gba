@@ -14,6 +14,41 @@ static struct DMA volatile *dma = (struct DMA volatile*)0x040000B0;
 
 struct rgb555 *palette = (struct rgb555*)0x05000000;
 
+/* Step 4 sprite definitions */
+static volatile struct oam_entry *const oam =
+    (volatile struct oam_entry*)0x07000000;
+static struct oam_entry shadow_oam[128];
+
+void sprite_init(void) {
+    /* Hide all sprites */
+    for (int i = 0; i < 128; i++) {
+        shadow_oam[i].attr0 = 0x0200; /* disable */
+        shadow_oam[i].attr1 = 0;
+        shadow_oam[i].attr2 = 0;
+        shadow_oam[i].pad   = 0;
+    }
+
+    /* Simple 8x8 square tile in OBJ VRAM (charblock 4) */
+    uint16_t *obj_tiles = (uint16_t*)0x06010000;
+    for (int i = 0; i < 16; i++) {
+        obj_tiles[i] = 0x2222; /* palette index 2 */
+    }
+
+    /* Place one test sprite using this tile */
+    shadow_oam[0].attr0 = (100 & 0xFF) | 0x0000; /* y, 4bpp, square */
+    shadow_oam[0].attr1 = (120 & 0x1FF) | 0x4000; /* x, size 0 (8x8) */
+    shadow_oam[0].attr2 = 0; /* tile index 0 */
+}
+
+void sprite_flush(void) {
+    for (int i = 0; i < 128; i++) {
+        oam[i].attr0 = shadow_oam[i].attr0;
+        oam[i].attr1 = shadow_oam[i].attr1;
+        oam[i].attr2 = shadow_oam[i].attr2;
+        oam[i].pad   = shadow_oam[i].pad;
+    }
+}
+
 static void font_to_tile(uint16_t *dst, const uint8_t src[8]) {
     /*
        Convert an 8x8 1bpp glyph into a 4bpp tile.  VRAM must be written
@@ -70,6 +105,8 @@ void draw_init(void) {
 struct fb* vsync_swap(void) {
     while (*reg_vcount >= H);
     while (*reg_vcount <  H);
+
+    sprite_flush();
 
     return (struct fb*)0x06000000; /* unused in tile mode */
 }
