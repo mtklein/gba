@@ -106,7 +106,7 @@ void main(void) {
         0x2220,0x0222, 0x2200,0x0022,
     };
     for (int i = 0; i < 16; i++) {
-        obj_tiles[2*16 + i] = ball_tile[i];
+        obj_tiles[4*16 + i] = ball_tile[i];
     }
 
     int    left_y  = (H-32)/2;
@@ -163,11 +163,13 @@ void main(void) {
                 ball_x = (W-8)/2;
                 ball_y = (H-8)/2;
                 ball_vx = -ball_vx;
+                ball_vy = 0;
             } else if (bx > W-8) {
                 score_l++;
                 ball_x = (W-8)/2;
                 ball_y = (H-8)/2;
                 ball_vx = -ball_vx;
+                ball_vy = 0;
             }
 
             int const diff = score_l - score_r;
@@ -190,7 +192,7 @@ void main(void) {
             {
                 .attr0 = ((int)ball_y & 0xFF) | (winner ? disable : 0),
                 .attr1 = (int)ball_x & 0x1FF,
-                .attr2 = 2 | (0<<12),             /* tile 2, palbank 0 */
+                .attr2 = 4 | (0<<12),             /* tile 4, palbank 0 */
             },
         };
 
