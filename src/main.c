@@ -113,8 +113,8 @@ void main(void) {
     int    right_y = (H-16)/2;
     _Accum ball_x  = (W-8)/2;
     _Accum ball_y  = (H-8)/2;
-    _Accum ball_vx = 2;
-    _Accum ball_vy = 1;
+    _Accum ball_vx = 1.5K;
+    _Accum ball_vy = 0;
     _Accum ball_ay = 1/256.0K;
     int score_l = 0;
     int score_r = 0;
@@ -158,14 +158,12 @@ void main(void) {
                 score_r++;
                 ball_x = (W-8)/2;
                 ball_y = (H-8)/2;
-                ball_vx = 2;
-                ball_vy = 1;
+                ball_vx = -ball_vx;
             } else if (bx > W-8) {
                 score_l++;
                 ball_x = (W-8)/2;
                 ball_y = (H-8)/2;
-                ball_vx = -2;
-                ball_vy = 1;
+                ball_vx = -ball_vx;
             }
 
             int const diff = score_l - score_r;
