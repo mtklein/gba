@@ -5,6 +5,7 @@ static uint16_t volatile *reg_keys = (uint16_t volatile*)0x04000130;
 
 void main(void) __attribute__((noreturn));
 void main(void) {
+    struct oam_entry shadow_oam[128];
     draw_init();
 
     /* Background and sprite palettes */
@@ -15,7 +16,7 @@ void main(void) {
     obj_palette[1]  = (struct rgb555){31,0,0,0};  /* left paddle */
     obj_palette[17] = (struct rgb555){0,0,31,0};  /* right paddle (bank 1 index 1) */
 
-    sprite_init();
+    sprite_init(shadow_oam);
 
     int left_y  = (H-16)/2;
     int right_y = (H-16)/2;
@@ -32,14 +33,14 @@ void main(void) {
         if (right_y < 0)     right_y = 0;
         if (right_y > H-16)  right_y = H-16;
 
-        shadow_oam[0].attr0 = (left_y & 0xFF) | 0x4000; /* tall */
+        shadow_oam[0].attr0 = (left_y & 0xFF) | 0x8000; /* tall */
         shadow_oam[0].attr1 = 10 & 0x1FF;               /* x */
         shadow_oam[0].attr2 = 0 | (0<<12);              /* tile 0, palbank 0 */
 
-        shadow_oam[1].attr0 = (right_y & 0xFF) | 0x4000;
+        shadow_oam[1].attr0 = (right_y & 0xFF) | 0x8000;
         shadow_oam[1].attr1 = (W-10-8) & 0x1FF;
         shadow_oam[1].attr2 = 0 | (1<<12);              /* palbank 1 */
 
-        vsync_swap();
+        vsync_swap(shadow_oam);
     }
 }

@@ -19,7 +19,6 @@ struct fb {
 
 void draw_init(void);
 
-struct fb* vsync_swap(void);
 
 void     clear(struct fb*, uint8_t color);
 void set_pixel(struct fb*, uint8_t color, int x, int y);
@@ -36,7 +35,7 @@ struct oam_entry {
     uint16_t pad;
 };
 
-extern struct oam_entry shadow_oam[128];
+void sprite_init(struct oam_entry shadow[128]);
+void sprite_flush(struct oam_entry const shadow[128]);
 
-void sprite_init(void);
-void sprite_flush(void);
+struct fb* vsync_swap(struct oam_entry const shadow[128]);

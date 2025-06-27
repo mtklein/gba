@@ -18,15 +18,14 @@ struct rgb555 *obj_palette  = (struct rgb555*)0x05000200;
 /* Step 4 sprite definitions */
 static volatile struct oam_entry *const oam =
     (volatile struct oam_entry*)0x07000000;
-struct oam_entry shadow_oam[128];
 
-void sprite_init(void) {
+void sprite_init(struct oam_entry shadow[128]) {
     /* Hide all sprites */
     for (int i = 0; i < 128; i++) {
-        shadow_oam[i].attr0 = 0x0200; /* disable */
-        shadow_oam[i].attr1 = 0;
-        shadow_oam[i].attr2 = 0;
-        shadow_oam[i].pad   = 0;
+        shadow[i].attr0 = 0x0200; /* disable */
+        shadow[i].attr1 = 0;
+        shadow[i].attr2 = 0;
+        shadow[i].pad   = 0;
     }
 
     /* Two 8x8 tiles form an 8x16 paddle in OBJ VRAM (charblock 4) */
@@ -38,12 +37,12 @@ void sprite_init(void) {
     }
 }
 
-void sprite_flush(void) {
+void sprite_flush(struct oam_entry const shadow[128]) {
     for (int i = 0; i < 128; i++) {
-        oam[i].attr0 = shadow_oam[i].attr0;
-        oam[i].attr1 = shadow_oam[i].attr1;
-        oam[i].attr2 = shadow_oam[i].attr2;
-        oam[i].pad   = shadow_oam[i].pad;
+        oam[i].attr0 = shadow[i].attr0;
+        oam[i].attr1 = shadow[i].attr1;
+        oam[i].attr2 = shadow[i].attr2;
+        oam[i].pad   = shadow[i].pad;
     }
 }
 
@@ -101,11 +100,11 @@ void draw_init(void) {
     }
 }
 
-struct fb* vsync_swap(void) {
+struct fb* vsync_swap(struct oam_entry const shadow[128]) {
     while (*reg_vcount >= H);
     while (*reg_vcount <  H);
 
-    sprite_flush();
+    sprite_flush(shadow);
 
     return (struct fb*)0x06000000; /* unused in tile mode */
 }
