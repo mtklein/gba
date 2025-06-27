@@ -10,6 +10,7 @@ extern struct rgb555 {
     uint16_t b : 5;
     uint16_t x : 1;
 } *palette;
+extern struct rgb555 *obj_palette;
 
 struct fb {
     uint16_t lo : 8;

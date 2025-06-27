@@ -12,7 +12,8 @@ struct DMA {
 };
 static struct DMA volatile *dma = (struct DMA volatile*)0x040000B0;
 
-struct rgb555 *palette = (struct rgb555*)0x05000000;
+struct rgb555 *palette      = (struct rgb555*)0x05000000;
+struct rgb555 *obj_palette  = (struct rgb555*)0x05000200;
 
 /* Step 4 sprite definitions */
 static volatile struct oam_entry *const oam =
