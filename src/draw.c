@@ -14,6 +14,17 @@ static struct DMA volatile *dma = (struct DMA volatile*)0x040000B0;
 
 struct rgb555 *palette = (struct rgb555*)0x05000000;
 
+static void font_to_tile(uint8_t *dst, const uint8_t src[8]) {
+    for (int r = 0; r < 8; r++) {
+        uint8_t bits = src[r];
+        for (int c = 0; c < 8; c += 2) {
+            uint8_t hi = (bits & (1 << (7 - c))) ? 1 : 0;
+            uint8_t lo = (bits & (1 << (7 - (c+1)))) ? 1 : 0;
+            *dst++ = (uint8_t)((hi << 4) | lo);
+        }
+    }
+}
+
 void draw_init(void) {
     /* Step 2: switch to tile background mode */
     uint16_t const mode0 = 0,
@@ -26,12 +37,24 @@ void draw_init(void) {
     uint16_t *tilemem  = (uint16_t*)0x06000000;
     uint16_t *mapmem   = (uint16_t*)0x0600F800;
 
-    /* simple tile filled with palette index 1 */
+    /* Step 2 demo tile filled with palette index 1 */
     for (int i = 0; i < 16; i++) {
         tilemem[i] = 0x1111;
     }
     for (int i = 0; i < 32*32; i++) {
-        mapmem[i] = 1;
+        mapmem[i] = 0;
+    }
+
+    /* Step 3: convert font digits to 4bpp tiles */
+
+    char digits[] = "0123456789";
+    for (int i = 0; i < 10; i++) {
+        font_to_tile((uint8_t*)tilemem + (i+1)*32, font_get(digits[i]));
+    }
+
+    /* place digits on the first row of the map */
+    for (int i = 0; i < 10; i++) {
+        mapmem[i] = (uint16_t)(i+1);
     }
 }
 
