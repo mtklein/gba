@@ -13,17 +13,17 @@ struct rgb555 {
     uint16_t x : 1;
 };
 
-static uint16_t volatile * const reg_dispcnt = (uint16_t volatile*)0x04000000,
-                         * const reg_vcount  = (uint16_t volatile*)0x04000006,
-                         * const reg_bg0cnt  = (uint16_t volatile*)0x04000008,
-                         * const reg_keys    = (uint16_t volatile*)0x04000130;
+static uint16_t volatile *const reg_dispcnt = (uint16_t volatile*)0x04000000,
+                         *const reg_vcount  = (uint16_t volatile*)0x04000006,
+                         *const reg_bg0cnt  = (uint16_t volatile*)0x04000008,
+                         *const reg_keys    = (uint16_t volatile*)0x04000130;
 
-static volatile struct rgb555 *  const bg_palette = (volatile struct rgb555*)0x05000000;
-static volatile struct rgb555 * const obj_palette = (volatile struct rgb555*)0x05000200;
+static struct rgb555 volatile *const  bg_palette = (struct rgb555 volatile*)0x05000000;
+static struct rgb555 volatile *const obj_palette = (struct rgb555 volatile*)0x05000200;
 
-static volatile uint16_t * const bg_tiles  = (uint16_t*)0x06000000,
-                         * const bg_map    = (uint16_t*)0x0600F800,
-                         * const obj_tiles = (uint16_t*)0x06010000;
+static uint16_t volatile *const bg_tiles  = (uint16_t*)0x06000000,
+                         *const bg_map    = (uint16_t*)0x0600F800,
+                         *const obj_tiles = (uint16_t*)0x06010000;
 
 struct sprite {
     uint16_t attr0, attr1, attr2;
@@ -32,9 +32,9 @@ struct oam {
     struct sprite sprite;
     uint16_t      pad;
 };
-static struct oam volatile * const oam = (struct oam volatile*)0x07000000;
+static struct oam volatile *const oam = (struct oam volatile*)0x07000000;
 
-static void font_to_tile(volatile uint16_t *tile, const uint8_t glyph[8]) {
+static void font_to_tile(uint16_t volatile *tile, const uint8_t glyph[8]) {
     for (int r = 0; r < 8; r++) {
         uint8_t const bits = glyph[r];
         uint8_t nib[8];
