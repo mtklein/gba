@@ -60,8 +60,18 @@ static void sprite_init(struct oam_entry shadow[128]) {
             obj_tiles[t*16 + i] = 0x1111; /* palette index 1 */
         }
     }
+    static const uint16_t ball_tile[16] = {
+        0x2200,0x0022,
+        0x2220,0x0222,
+        0x2222,0x2222,
+        0x2222,0x2222,
+        0x2222,0x2222,
+        0x2222,0x2222,
+        0x2220,0x0222,
+        0x2200,0x0022,
+    };
     for (int i = 0; i < 16; i++) {
-        obj_tiles[2*16 + i] = 0x2222; /* palette index 2 */
+        obj_tiles[2*16 + i] = ball_tile[i];
     }
 }
 
