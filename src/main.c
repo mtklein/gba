@@ -32,6 +32,10 @@ static struct DMA volatile *dma = (struct DMA volatile*)0x040000B0;
 static struct rgb555 *palette     = (struct rgb555*)0x05000000;
 static struct rgb555 *obj_palette = (struct rgb555*)0x05000200;
 
+/* BG0 tile and map memory pointers */
+static uint16_t *bg_tiles;
+static uint16_t *bg_map;
+
 /* Step 4 sprite definitions */
 struct oam_entry {
     uint16_t attr0;
@@ -109,27 +113,47 @@ static void draw_init(void) {
     /* BG0: charblock 0, screenblock 31, 4bpp */
     *reg_bg0cnt = (0<<2) | (0<<7) | (31<<8);
 
-    uint16_t *tilemem = (uint16_t*)0x06000000;
-    uint16_t *mapmem  = (uint16_t*)0x0600F800;
+    bg_tiles = (uint16_t*)0x06000000;
+    bg_map   = (uint16_t*)0x0600F800;
 
     /* Step 2 demo tile filled with palette index 0 (white background) */
     for (int i = 0; i < 16; i++) {
-        tilemem[i] = 0x0000;
+        bg_tiles[i] = 0x0000; /* blank tile */
     }
     for (int i = 0; i < 32*32; i++) {
-        mapmem[i] = 0;
+        bg_map[i] = 0;        /* clear map */
     }
 
-    /* Step 3: convert font digits to 4bpp tiles */
-    char digits[] = "0123456789";
-    for (int i = 0; i < 10; i++) {
-        font_to_tile(tilemem + (i+1)*16, font_get(digits[i]));
+    /* Convert basic ASCII characters to tiles */
+    for (int ch = 32; ch <= 126; ch++) {
+        font_to_tile(bg_tiles + (ch-32+1)*16, font_get((char)ch));
     }
+}
 
-    /* place digits on the first row of the map */
-    for (int i = 0; i < 10; i++) {
-        mapmem[i] = (uint16_t)(i+1);
+static inline uint16_t tile_for_char(char ch) {
+    if (ch < 32 || ch > 126) return 0;
+    return (uint16_t)(ch - 32 + 1);
+}
+
+static void bg_draw_char(int x, int y, char ch) {
+    bg_map[y*32 + x] = tile_for_char(ch);
+}
+
+static void bg_draw_str(int x, int y, char const *s) {
+    for (; *s; s++, x++) {
+        bg_draw_char(x, y, *s);
     }
+}
+
+static void bg_draw_num(int x, int y, int v) {
+    int tens = (v * 103) >> 10; /* approximate v/10 for v < 100 */
+    int ones = v - tens*10;
+    if (tens) {
+        bg_draw_char(x, y, (char)('0' + tens));
+    } else {
+        bg_draw_char(x, y, ' ');
+    }
+    bg_draw_char(x+1, y, (char)('0' + ones));
 }
 
 static struct fb* vsync_swap(struct oam_entry const shadow[128]) {
@@ -232,32 +256,67 @@ void main(void) {
     int ball_y  = (H-8)/2;
     int ball_vx = 2;
     int ball_vy = 1;
+    int score_l = 0;
+    int score_r = 0;
+    int winner  = 0;
+
+    bg_draw_num(3,1, score_l);
+    bg_draw_num(27,1, score_r);
 
     for (;;) {
         uint16_t keys = ~*reg_keys;
-        if (keys & (1<<6)) { left_y  -= 2; }
-        if (keys & (1<<7)) { left_y  += 2; }
-        if (keys & (1<<0)) { right_y -= 2; }
-        if (keys & (1<<1)) { right_y += 2; }
+        if (!winner) {
+            if (keys & (1<<6)) { left_y  -= 2; }
+            if (keys & (1<<7)) { left_y  += 2; }
+            if (keys & (1<<0)) { right_y -= 2; }
+            if (keys & (1<<1)) { right_y += 2; }
+        }
 
         if (left_y  < 0)     left_y  = 0;
         if (left_y  > H-16)  left_y  = H-16;
         if (right_y < 0)     right_y = 0;
         if (right_y > H-16)  right_y = H-16;
 
-        ball_x += ball_vx;
-        ball_y += ball_vy;
-        if (ball_y <= 0 || ball_y >= H-8) ball_vy = -ball_vy;
-        if (ball_x <= 0 || ball_x >= W-8) ball_vx = -ball_vx;
-
-        if (ball_x <= 10+8 && ball_x+8 >= 10 &&
-            ball_y+8 >= left_y && ball_y <= left_y+16 && ball_vx < 0) {
-            ball_vx = -ball_vx;
+        if (!winner) {
+            ball_x += ball_vx;
+            ball_y += ball_vy;
+            if (ball_y <= 0 || ball_y >= H-8) ball_vy = -ball_vy;
         }
 
-        if (ball_x+8 >= W-10-8 && ball_x <= W-10-8+8 &&
-            ball_y+8 >= right_y && ball_y <= right_y+16 && ball_vx > 0) {
-            ball_vx = -ball_vx;
+        if (!winner) {
+            if (ball_x <= 10+8 && ball_x+8 >= 10 &&
+                ball_y+8 >= left_y && ball_y <= left_y+16 && ball_vx < 0) {
+                ball_vx = -ball_vx;
+            }
+
+            if (ball_x+8 >= W-10-8 && ball_x <= W-10-8+8 &&
+                ball_y+8 >= right_y && ball_y <= right_y+16 && ball_vx > 0) {
+                ball_vx = -ball_vx;
+            }
+
+            if (ball_x < 0) {
+                score_r++;
+                bg_draw_num(27,1, score_r);
+                ball_x = (W-8)/2;
+                ball_y = (H-8)/2;
+                ball_vx = 2;
+                ball_vy = 1;
+                left_y  = right_y = (H-16)/2;
+            } else if (ball_x > W-8) {
+                score_l++;
+                bg_draw_num(3,1, score_l);
+                ball_x = (W-8)/2;
+                ball_y = (H-8)/2;
+                ball_vx = -2;
+                ball_vy = 1;
+                left_y  = right_y = (H-16)/2;
+            }
+
+            int diff = score_l - score_r;
+            if ((score_l>=11 || score_r>=11) && (diff>=2 || diff<=-2)) {
+                winner = diff>0 ? 1 : 2;
+                bg_draw_str(12,10, winner==1 ? "P1 WINS!" : "P2 WINS!");
+            }
         }
 
         shadow_oam[0].attr0 = (left_y & 0xFF) | 0x8000; /* tall */

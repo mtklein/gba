@@ -51,9 +51,17 @@ incrementally.
 
 9. **Final Cleanup and Testing**
    - Ensure `vsync_swap()` only waits for VBlank and handles OAM copying.
-   - Play a full game verifying scoring, win conditions and particle effects.
-   - Once behavior matches the original version, remove the old framebuffer
-     code paths entirely.
+   - Remove bitmap-oriented helpers once no longer used.
+
+10. **Restore Scoring and Endgame**
+   - Use the BG0 tile map to display each player's score.
+   - When the ball exits the screen, increment the opposing player's score and
+     reset the ball and paddles to the starting position.
+   - Detect when a player reaches 11 points with a 2 point lead to declare the
+     winner.
+   - Display "P1 WINS!" or "P2 WINS!" centered on screen using tiled text.
+   - After verifying scoring and win conditions, remove any remaining bitmap
+     drawing code.
 
 Local Testing Instructions
 -------------------------
