@@ -33,8 +33,8 @@ static struct rgb555 *palette     = (struct rgb555*)0x05000000;
 static struct rgb555 *obj_palette = (struct rgb555*)0x05000200;
 
 /* BG0 tile and map memory pointers */
-static uint16_t *bg_tiles;
-static uint16_t *bg_map;
+static volatile uint16_t *bg_tiles;
+static volatile uint16_t *bg_map;
 
 /* Step 4 sprite definitions */
 struct oam_entry {
@@ -88,7 +88,7 @@ static void sprite_flush(struct oam_entry const shadow[128]) {
     }
 }
 
-static void font_to_tile(uint16_t *dst, const uint8_t src[8]) {
+static void font_to_tile(volatile uint16_t *dst, const uint8_t src[8]) {
     /* Convert an 8x8 1bpp glyph into a 4bpp tile. */
     for (int r = 0; r < 8; r++) {
         uint8_t bits = src[r];
@@ -301,7 +301,6 @@ void main(void) {
                 ball_y = (H-8)/2;
                 ball_vx = 2;
                 ball_vy = 1;
-                left_y  = right_y = (H-16)/2;
             } else if (ball_x > W-8) {
                 score_l++;
                 bg_draw_num(3,1, score_l);
@@ -309,7 +308,6 @@ void main(void) {
                 ball_y = (H-8)/2;
                 ball_vx = -2;
                 ball_vy = 1;
-                left_y  = right_y = (H-16)/2;
             }
 
             int diff = score_l - score_r;
