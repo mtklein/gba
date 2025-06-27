@@ -126,8 +126,20 @@ static void vsync(void) {
     while (*reg_vcount <  H);
 }
 
+static uint32_t rng;
+
+static void srand_lcg(uint32_t seed) {
+    rng = seed;
+}
+
+static uint32_t rand_lcg(void) {
+    rng = rng * 1664525u + 1013904223u;
+    return rng;
+}
+
 __attribute__((noreturn))
 void main(void) {
+    unsigned frame = 0;
     *reg_dispcnt = (struct dispcnt){
         .obj_vram_mapping = 1,
         .enable_bg0       = 1,
@@ -284,9 +296,11 @@ void main(void) {
             int const diff = score_l - score_r;
             if ((score_l>=11 || score_r>=11) && (diff>=2 || diff<=-2)) {
                 winner = diff>0 ? 1 : 2;
+                srand_lcg(frame);
                 for (int i = 0; i < len(stars); i++) {
                     _Accum const s = 0.75K;
-                    switch (i & 7) {
+                    int dir = (int)(rand_lcg() >> 29); // top 3 bits
+                    switch (dir) {
                         case 0:  stars[i].vx = +s;  stars[i].vy =  0;  break;
                         case 1:  stars[i].vx = +s;  stars[i].vy = -s; break;
                         case 2:  stars[i].vx =  0;  stars[i].vy = -s; break;
@@ -325,6 +339,7 @@ void main(void) {
         }
 
         vsync();
+        frame++;
 
         for (int i = 0; i < len(sprite); i++) {
             oam[i].attr0 = sprite[i].attr0;
