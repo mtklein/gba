@@ -277,9 +277,6 @@ void main(void) {
         if (right_y < 0)     right_y = 0;
         if (right_y > H-16)  right_y = H-16;
 
-        /* Always refresh the scoreboard in case VRAM writes were lost */
-        bg_draw_num(3,1, score_l);
-        bg_draw_num(27,1, score_r);
 
         if (!winner) {
             ball_x += ball_vx;
@@ -300,14 +297,12 @@ void main(void) {
 
             if (ball_x < 0) {
                 score_r++;
-                bg_draw_num(27,1, score_r);
                 ball_x = (W-8)/2;
                 ball_y = (H-8)/2;
                 ball_vx = 2;
                 ball_vy = 1;
             } else if (ball_x > W-8) {
                 score_l++;
-                bg_draw_num(3,1, score_l);
                 ball_x = (W-8)/2;
                 ball_y = (H-8)/2;
                 ball_vx = -2;
@@ -334,5 +329,9 @@ void main(void) {
         shadow_oam[2].attr2 = 2 | (0<<12);             /* tile 2, palbank 0 */
 
         vsync_swap(shadow_oam);
+
+        /* Update the scoreboard while VRAM access is safe */
+        bg_draw_num(3,1, score_l);
+        bg_draw_num(27,1, score_r);
     }
 }
