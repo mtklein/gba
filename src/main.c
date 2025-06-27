@@ -10,44 +10,43 @@ struct rgb555 {
     uint16_t r : 5;
     uint16_t g : 5;
     uint16_t b : 5;
-    uint16_t x : 1;
+    uint16_t   : 1;
 };
+static struct rgb555 volatile *const  bg_palette = (struct rgb555 volatile*)0x05000000,
+                              *const obj_palette = (struct rgb555 volatile*)0x05000200;
 
 struct dispcnt {
     uint16_t mode              : 3;
     uint16_t cgb_mode          : 1;
     uint16_t display_frame     : 1;
     uint16_t hblank_free       : 1;
-    uint16_t obj_vram_mapping  : 1; /* bit 6 */
+    uint16_t obj_vram_mapping  : 1;
     uint16_t forced_blank      : 1;
-    uint16_t bg0_enable        : 1; /* bit 8 */
-    uint16_t bg1_enable        : 1;
-    uint16_t bg2_enable        : 1;
-    uint16_t bg3_enable        : 1;
-    uint16_t obj_enable        : 1; /* bit 12 */
-    uint16_t win0_enable       : 1;
-    uint16_t win1_enable       : 1;
-    uint16_t objwin_enable     : 1;
+    uint16_t enable_bg0        : 1;
+    uint16_t enable_bg1        : 1;
+    uint16_t enable_bg2        : 1;
+    uint16_t enable_bg3        : 1;
+    uint16_t enable_obj        : 1;
+    uint16_t enable_win0       : 1;
+    uint16_t enable_win1       : 1;
+    uint16_t enable_objwin     : 1;
 };
+static struct dispcnt volatile *const reg_dispcnt = (struct dispcnt volatile*)0x04000000;
 
 struct bgcnt {
     uint16_t priority          : 2;
     uint16_t char_base_block   : 2;
     uint16_t mosaic            : 1;
     uint16_t color_mode        : 1;
-    uint16_t _unused0          : 2; /* bits 6-7 */
-    uint16_t screen_base_block : 5; /* bits 8-12 */
+    uint16_t                   : 2;
+    uint16_t screen_base_block : 5;
     uint16_t area_overflow     : 1;
     uint16_t screen_size       : 2;
 };
+static struct bgcnt volatile *const reg_bg0cnt  = (struct bgcnt volatile*)0x04000008;
 
-static struct dispcnt volatile *const reg_dispcnt = (struct dispcnt volatile*)0x04000000;
-static uint16_t   volatile *const reg_vcount  = (uint16_t   volatile*)0x04000006;
-static struct bgcnt  volatile *const reg_bg0cnt  = (struct bgcnt  volatile*)0x04000008;
-static uint16_t   volatile *const reg_keys    = (uint16_t   volatile*)0x04000130;
-
-static struct rgb555 volatile *const  bg_palette = (struct rgb555 volatile*)0x05000000;
-static struct rgb555 volatile *const obj_palette = (struct rgb555 volatile*)0x05000200;
+static uint16_t volatile *const reg_vcount = (uint16_t volatile*)0x04000006;
+static uint16_t volatile *const reg_keys   = (uint16_t volatile*)0x04000130;
 
 static uint16_t volatile *const bg_tiles  = (uint16_t*)0x06000000,
                          *const bg_map    = (uint16_t*)0x0600F800,
@@ -55,25 +54,24 @@ static uint16_t volatile *const bg_tiles  = (uint16_t*)0x06000000,
 
 struct oam {
     struct {
-        uint16_t y      : 8;
-        uint16_t        : 1;
-        uint16_t hide   : 1;
-        uint16_t        : 4;
-        uint16_t shape  : 2;
+        uint16_t y       :  8;
+        uint16_t         :  1;
+        uint16_t hide    :  1;
+        uint16_t         :  4;
+        uint16_t shape   :  2;
     } attr0;
     struct {
-        uint16_t x      : 9;
-        uint16_t        : 5;
-        uint16_t size   : 2;
+        uint16_t x       :  9;
+        uint16_t         :  5;
+        uint16_t size    :  2;
     } attr1;
     struct {
-        uint16_t tile   : 10;
-        uint16_t        : 2;
-        uint16_t palbank: 4;
+        uint16_t tile    : 10;
+        uint16_t         :  2;
+        uint16_t palbank :  4;
     } attr2;
-    uint16_t pad;
+    uint16_t             : 16;
 };
-
 static struct oam volatile *const oam = (struct oam volatile*)0x07000000;
 
 static void font_to_tile(uint16_t volatile *tile, const uint8_t glyph[8]) {
@@ -115,20 +113,20 @@ __attribute__((noreturn))
 void main(void) {
     *reg_dispcnt = (struct dispcnt){
         .obj_vram_mapping = 1,
-        .bg0_enable       = 1,
-        .obj_enable       = 1,
+        .enable_bg0       = 1,
+        .enable_obj       = 1,
     };
-    *reg_bg0cnt  = (struct bgcnt){
+    *reg_bg0cnt = (struct bgcnt){
         .screen_base_block = 31,
     };
 
-    bg_palette[0] = (struct rgb555){.r=31, .g=31, .b=31};
-    bg_palette[1] = (struct rgb555){.r= 0, .g= 0, .b= 0};
+    bg_palette[0] = (struct rgb555){31,31,31};
+    bg_palette[1] = (struct rgb555){ 0, 0, 0};
 
-    obj_palette[ 0] = (struct rgb555){.r=31, .g=31, .b=31};
-    obj_palette[ 1] = (struct rgb555){.r=31, .g= 0, .b= 0};
-    obj_palette[ 2] = (struct rgb555){.r= 0, .g=31, .b= 0};
-    obj_palette[17] = (struct rgb555){.r= 0, .g= 0, .b=31};
+    obj_palette[ 0] = (struct rgb555){31,31,31};
+    obj_palette[ 1] = (struct rgb555){31, 0, 0};
+    obj_palette[ 2] = (struct rgb555){ 0,31, 0};
+    obj_palette[17] = (struct rgb555){ 0, 0,31};
 
     for (int ch = 32; ch < 127; ch++) {
         font_to_tile(bg_tiles + (ch-32+1)*16, font_get((char)ch));
@@ -136,16 +134,8 @@ void main(void) {
     for (int i = 0; i < 32*32; i++) {
         bg_map[i] = 0;
     }
-
     for (int i = 0; i < 128; i++) {
-        oam[i].attr0.y     = 0;
-        oam[i].attr0.hide  = 1;
-        oam[i].attr0.shape = 0;
-        oam[i].attr1.x     = 0;
-        oam[i].attr1.size  = 0;
-        oam[i].attr2.tile  = 0;
-        oam[i].attr2.palbank = 0;
-        oam[i].pad         = 0;
+        oam[i] = (struct oam){.attr0.hide = 1};
     }
 
     for (int t = 0; t < 4; t++) {
@@ -153,8 +143,7 @@ void main(void) {
             obj_tiles[t*16 + i] = 0x1111;
         }
     }
-
-    static const uint16_t ball_tile[16] = {
+    static const uint16_t ball_tile[] = {
         0x2200,0x0022, 0x2220,0x0222,
         0x2222,0x2222, 0x2222,0x2222,
         0x2222,0x2222, 0x2222,0x2222,
@@ -177,12 +166,10 @@ void main(void) {
 
     for (;;) {
         uint16_t keys = ~*reg_keys;
-        if (!winner) {
-            if (keys & (1<<6)) { left_y  -= 2; }
-            if (keys & (1<<7)) { left_y  += 2; }
-            if (keys & (1<<0)) { right_y -= 2; }
-            if (keys & (1<<1)) { right_y += 2; }
-        }
+        if (keys & (1<<6)) { left_y  -= 2; }
+        if (keys & (1<<7)) { left_y  += 2; }
+        if (keys & (1<<0)) { right_y -= 2; }
+        if (keys & (1<<1)) { right_y += 2; }
 
         if (left_y  < 0)     left_y  = 0;
         if (left_y  > H-32)  left_y  = H-32;
@@ -235,22 +222,19 @@ void main(void) {
 
         struct oam sprite[] = {
             {
-                .attr0 = { .y = (uint16_t)left_y,  .hide = 0, .shape = 2 },
-                .attr1 = { .x = 10,               .size = 1 },
-                .attr2 = { .tile = 0,             .palbank = 0 },
-                .pad   = 0,
+                .attr0 = { .y = (uint16_t)left_y, .shape = 2 },
+                .attr1 = { .x =               10, .size  = 1 },
+                .attr2 = { .tile = 0, .palbank = 0 },
             },
             {
-                .attr0 = { .y = (uint16_t)right_y, .hide = 0, .shape = 2 },
-                .attr1 = { .x = (uint16_t)(W-10-8), .size = 1 },
-                .attr2 = { .tile = 0,              .palbank = 1 },
-                .pad   = 0,
+                .attr0 = { .y = (uint16_t) right_y, .shape = 2 },
+                .attr1 = { .x = (uint16_t)(W-10-8), .size  = 1 },
+                .attr2 = { .tile = 0, .palbank = 1 },
             },
             {
-                .attr0 = { .y = (uint16_t)ball_y, .hide = (uint16_t)winner, .shape = 0 },
-                .attr1 = { .x = (uint16_t)ball_x, .size = 0 },
-                .attr2 = { .tile = 4,             .palbank = 0 },
-                .pad   = 0,
+                .attr0 = { .y = (uint16_t)ball_y, .shape = 0, .hide = (uint16_t)!!winner },
+                .attr1 = { .x = (uint16_t)ball_x, .size  = 0 },
+                .attr2 = { .tile = 4, .palbank = 0 },
             },
         };
 
@@ -260,7 +244,6 @@ void main(void) {
             oam[i].attr0 = sprite[i].attr0;
             oam[i].attr1 = sprite[i].attr1;
             oam[i].attr2 = sprite[i].attr2;
-            oam[i].pad   = 0;
         }
         bg_draw_num( 3,1, score_l);
         bg_draw_num(27,1, score_r);
