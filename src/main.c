@@ -13,10 +13,38 @@ struct rgb555 {
     uint16_t x : 1;
 };
 
-static uint16_t volatile *const reg_dispcnt = (uint16_t volatile*)0x04000000,
-                         *const reg_vcount  = (uint16_t volatile*)0x04000006,
-                         *const reg_bg0cnt  = (uint16_t volatile*)0x04000008,
-                         *const reg_keys    = (uint16_t volatile*)0x04000130;
+struct dispcnt {
+    uint16_t mode              : 3;
+    uint16_t cgb_mode          : 1;
+    uint16_t display_frame     : 1;
+    uint16_t hblank_free       : 1;
+    uint16_t obj_vram_mapping  : 1; /* bit 6 */
+    uint16_t forced_blank      : 1;
+    uint16_t bg0_enable        : 1; /* bit 8 */
+    uint16_t bg1_enable        : 1;
+    uint16_t bg2_enable        : 1;
+    uint16_t bg3_enable        : 1;
+    uint16_t obj_enable        : 1; /* bit 12 */
+    uint16_t win0_enable       : 1;
+    uint16_t win1_enable       : 1;
+    uint16_t objwin_enable     : 1;
+};
+
+struct bgcnt {
+    uint16_t priority          : 2;
+    uint16_t char_base_block   : 2;
+    uint16_t mosaic            : 1;
+    uint16_t color_mode        : 1;
+    uint16_t _unused0          : 2; /* bits 6-7 */
+    uint16_t screen_base_block : 5; /* bits 8-12 */
+    uint16_t area_overflow     : 1;
+    uint16_t screen_size       : 2;
+};
+
+static struct dispcnt volatile *const reg_dispcnt = (struct dispcnt volatile*)0x04000000;
+static uint16_t   volatile *const reg_vcount  = (uint16_t   volatile*)0x04000006;
+static struct bgcnt  volatile *const reg_bg0cnt  = (struct bgcnt  volatile*)0x04000008;
+static uint16_t   volatile *const reg_keys    = (uint16_t   volatile*)0x04000130;
 
 static struct rgb555 volatile *const  bg_palette = (struct rgb555 volatile*)0x05000000;
 static struct rgb555 volatile *const obj_palette = (struct rgb555 volatile*)0x05000200;
@@ -70,8 +98,14 @@ static void vsync(void) {
 
 __attribute__((noreturn))
 void main(void) {
-    *reg_dispcnt = 1<< 6 | 1<<8 | 1<<12;
-    *reg_bg0cnt  = 31<<8;
+    *reg_dispcnt = (struct dispcnt){
+        .obj_vram_mapping = 1,
+        .bg0_enable       = 1,
+        .obj_enable       = 1,
+    };
+    *reg_bg0cnt  = (struct bgcnt){
+        .screen_base_block = 31,
+    };
 
     bg_palette[0] = (struct rgb555){.r=31, .g=31, .b=31};
     bg_palette[1] = (struct rgb555){.r= 0, .g= 0, .b= 0};
