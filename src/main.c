@@ -126,15 +126,8 @@ static void vsync(void) {
     while (*reg_vcount <  H);
 }
 
-static uint32_t rng;
-
-static void srand_lcg(uint32_t seed) {
-    rng = seed;
-}
-
-static uint32_t rand_lcg(void) {
-    rng = rng * 1664525u + 1013904223u;
-    return rng;
+static uint32_t rand_lcg(uint32_t x) {
+    return x * 1664525u + 1013904223u;
 }
 
 __attribute__((noreturn))
@@ -296,20 +289,13 @@ void main(void) {
             int const diff = score_l - score_r;
             if ((score_l>=11 || score_r>=11) && (diff>=2 || diff<=-2)) {
                 winner = diff>0 ? 1 : 2;
-                srand_lcg(frame);
+                uint32_t rng = frame;
                 for (int i = 0; i < len(stars); i++) {
                     _Accum const s = 0.75K;
-                    int dir = (int)(rand_lcg() >> 29); // top 3 bits
-                    switch (dir) {
-                        case 0:  stars[i].vx = +s;  stars[i].vy =  0;  break;
-                        case 1:  stars[i].vx = +s;  stars[i].vy = -s; break;
-                        case 2:  stars[i].vx =  0;  stars[i].vy = -s; break;
-                        case 3:  stars[i].vx = -s;  stars[i].vy = -s; break;
-                        case 4:  stars[i].vx = -s;  stars[i].vy =  0;  break;
-                        case 5:  stars[i].vx = -s;  stars[i].vy = +s; break;
-                        case 6:  stars[i].vx =  0;  stars[i].vy = +s; break;
-                        default: stars[i].vx = +s;  stars[i].vy = +s; break;
-                    }
+                    rng = rand_lcg(rng);
+                    stars[i].vx = (rng >> 31) ? -s : s;
+                    rng = rand_lcg(rng);
+                    stars[i].vy = (rng >> 31) ? -s : s;
                 }
             }
         }
