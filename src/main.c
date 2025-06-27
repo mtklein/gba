@@ -239,6 +239,7 @@ void main(void) {
             int const diff = score_l - score_r;
             if ((score_l>=11 || score_r>=11) && (diff>=2 || diff<=-2)) {
                 winner = diff>0 ? 1 : 2;
+                bg_palette[1] = obj_palette[winner==1 ? 1 : 17];
             }
         }
 
