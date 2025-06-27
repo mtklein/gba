@@ -294,9 +294,9 @@ void main(void) {
                 _Accum const scale = s / 32768.0K;
                 for (int i = 0; i < len(stars); i++) {
                     rng = rand_lcg(rng);
-                    stars[i].vx = (int16_t)(rng >> 16) * scale;
+                    stars[i].vx = ((int32_t)rng >> 16) * scale;
                     rng = rand_lcg(rng);
-                    stars[i].vy = (int16_t)(rng >> 16) * scale;
+                    stars[i].vy = ((int32_t)rng >> 16) * scale;
                 }
             }
         }
