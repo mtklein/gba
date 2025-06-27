@@ -29,8 +29,8 @@ struct DMA {
 };
 static struct DMA volatile *dma = (struct DMA volatile*)0x040000B0;
 
-static struct rgb555 *palette     = (struct rgb555*)0x05000000;
-static struct rgb555 *obj_palette = (struct rgb555*)0x05000200;
+static volatile struct rgb555 *palette     = (volatile struct rgb555*)0x05000000;
+static volatile struct rgb555 *obj_palette = (volatile struct rgb555*)0x05000200;
 
 /* BG0 tile and map memory pointers */
 static volatile uint16_t *bg_tiles;
@@ -276,6 +276,10 @@ void main(void) {
         if (left_y  > H-16)  left_y  = H-16;
         if (right_y < 0)     right_y = 0;
         if (right_y > H-16)  right_y = H-16;
+
+        /* Always refresh the scoreboard in case VRAM writes were lost */
+        bg_draw_num(3,1, score_l);
+        bg_draw_num(27,1, score_r);
 
         if (!winner) {
             ball_x += ball_vx;
