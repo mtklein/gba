@@ -58,6 +58,10 @@ static struct rgb555 const warm_colors[] = {
 static struct rgb555 const cool_colors[] = {
     { 0, 0,31}, { 0,31,31}, { 0,31, 0}, {10,10,31},
 };
+static struct rgb555 const star_colors[] = {
+    {31, 0, 0}, {31,31, 0}, { 0,31, 0}, { 0,31,31},
+    { 0, 0,31}, {31, 0,31}, {31,15, 0}, {15, 0,31},
+};
 
 struct oam {
     struct {
@@ -80,6 +84,12 @@ struct oam {
     uint16_t             : 16;
 };
 static struct oam volatile *const oam = (struct oam volatile*)0x07000000;
+
+struct star {
+    _Accum x, y, vx, vy;
+    uint8_t palbank;
+    uint8_t pad[3];
+};
 
 static void font_to_tile(uint16_t volatile *tile, const uint8_t glyph[8]) {
     for (int r = 0; r < 8; r++) {
@@ -137,6 +147,11 @@ void main(void) {
     obj_palette[ 1] = warm_colors[warm_idx];
     obj_palette[ 2] = (struct rgb555){ 0,31, 0};
     obj_palette[17] = cool_colors[cool_idx];
+    for (int i = 0; i < len(star_colors); i++) {
+        int base = (2 + i) * 16;
+        obj_palette[base + 0] = (struct rgb555){31,31,31};
+        obj_palette[base + 1] = star_colors[i];
+    }
 
     for (int ch = 32; ch < 127; ch++) {
         font_to_tile(bg_tiles + (ch-32+1)*16, font_get((char)ch));
@@ -162,6 +177,27 @@ void main(void) {
     for (int i = 0; i < 16; i++) {
         obj_tiles[4*16 + i] = ball_tile[i];
     }
+    static const uint16_t star_tile[] = {
+        0x3000,0x0000, 0x3300,0x0003,
+        0x3030,0x0030, 0x3333,0x0333,
+        0x3030,0x0030, 0x3300,0x0003,
+        0x3000,0x0000, 0x0000,0x0000,
+    };
+    for (int i = 0; i < 16; i++) {
+        obj_tiles[5*16 + i] = star_tile[i];
+    }
+
+    struct star stars[9];
+    for (int i = 0; i < len(stars); i++) {
+        stars[i] = (struct star){
+            .x = (W-8)/2,
+            .y = (H-8)/2,
+            .vx = 0,
+            .vy = 0,
+            .palbank = (uint8_t)(2 + (i & 7)),
+        };
+    }
+    int next_star_color = 0;
 
     _Accum left_y  = (H-32)/2;
     _Accum right_y = (H-32)/2;
@@ -197,6 +233,15 @@ void main(void) {
         if (left_y  > H-32)  left_y  = H-32;
         if (right_y < 0)     right_y = 0;
         if (right_y > H-32)  right_y = H-32;
+
+        for (int i = 0; i < len(stars); i++) {
+            stars[i].x += stars[i].vx;
+            stars[i].y += stars[i].vy;
+            if (winner) {
+                stars[i].vy += 1/256.0K;
+                stars[i].palbank = (uint8_t)(2 + (++next_star_color % len(star_colors)));
+            }
+        }
 
         if (!winner) {
             ball_vy += ball_ay;
@@ -239,26 +284,45 @@ void main(void) {
             int const diff = score_l - score_r;
             if ((score_l>=11 || score_r>=11) && (diff>=2 || diff<=-2)) {
                 winner = diff>0 ? 1 : 2;
+                for (int i = 0; i < len(stars); i++) {
+                    _Accum const s = 0.75K;
+                    switch (i & 7) {
+                        case 0:  stars[i].vx = +s;  stars[i].vy =  0;  break;
+                        case 1:  stars[i].vx = +s;  stars[i].vy = -s; break;
+                        case 2:  stars[i].vx =  0;  stars[i].vy = -s; break;
+                        case 3:  stars[i].vx = -s;  stars[i].vy = -s; break;
+                        case 4:  stars[i].vx = -s;  stars[i].vy =  0;  break;
+                        case 5:  stars[i].vx = -s;  stars[i].vy = +s; break;
+                        case 6:  stars[i].vx =  0;  stars[i].vy = +s; break;
+                        default: stars[i].vx = +s;  stars[i].vy = +s; break;
+                    }
+                }
             }
         }
 
-        struct oam sprite[] = {
-            {
-                .attr0 = { .y = left_y, .shape = 2 },
-                .attr1 = { .x =     10, .size  = 1 },
-                .attr2 = { .tile = 0, .palbank = 0 },
-            },
-            {
-                .attr0 = { .y =  right_y, .shape = 2 },
-                .attr1 = { .x = (W-10-8), .size  = 1 },
-                .attr2 = { .tile = 0, .palbank = 1 },
-            },
-            {
-                .attr0 = { .y = ball_y, .shape = 0, .hide = !!winner },
-                .attr1 = { .x = ball_x, .size  = 0 },
-                .attr2 = { .tile = 4, .palbank = 0 },
-            },
+        struct oam sprite[3 + len(stars)];
+        sprite[0] = (struct oam){
+            .attr0 = { .y = left_y, .shape = 2 },
+            .attr1 = { .x =     10, .size  = 1 },
+            .attr2 = { .tile = 0, .palbank = 0 },
         };
+        sprite[1] = (struct oam){
+            .attr0 = { .y =  right_y, .shape = 2 },
+            .attr1 = { .x = (W-10-8), .size  = 1 },
+            .attr2 = { .tile = 0, .palbank = 1 },
+        };
+        sprite[2] = (struct oam){
+            .attr0 = { .y = ball_y, .shape = 0, .hide = !!winner },
+            .attr1 = { .x = ball_x, .size  = 0 },
+            .attr2 = { .tile = 4, .palbank = 0 },
+        };
+        for (int i = 0; i < len(stars); i++) {
+            sprite[3+i] = (struct oam){
+                .attr0 = { .y = stars[i].y, .shape = 0, .hide = !winner },
+                .attr1 = { .x = stars[i].x, .size  = 0 },
+                .attr2 = { .tile = 5, .palbank = stars[i].palbank },
+            };
+        }
 
         vsync();
 
