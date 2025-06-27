@@ -25,13 +25,27 @@ static uint16_t volatile *const bg_tiles  = (uint16_t*)0x06000000,
                          *const bg_map    = (uint16_t*)0x0600F800,
                          *const obj_tiles = (uint16_t*)0x06010000;
 
-struct sprite {
-    uint16_t attr0, attr1, attr2;
-};
 struct oam {
-    struct sprite sprite;
-    uint16_t      pad;
+    struct {
+        uint16_t y      : 8;
+        uint16_t        : 1;
+        uint16_t hide   : 1;
+        uint16_t        : 4;
+        uint16_t shape  : 2;
+    } attr0;
+    struct {
+        uint16_t x      : 9;
+        uint16_t        : 5;
+        uint16_t size   : 2;
+    } attr1;
+    struct {
+        uint16_t tile   : 10;
+        uint16_t        : 2;
+        uint16_t palbank: 4;
+    } attr2;
+    uint16_t pad;
 };
+
 static struct oam volatile *const oam = (struct oam volatile*)0x07000000;
 
 static void font_to_tile(uint16_t volatile *tile, const uint8_t glyph[8]) {
@@ -88,9 +102,15 @@ void main(void) {
         bg_map[i] = 0;
     }
 
-    uint16_t const disable = 0x0200;
     for (int i = 0; i < 128; i++) {
-        oam[i].sprite.attr0 = disable;
+        oam[i].attr0.y     = 0;
+        oam[i].attr0.hide  = 1;
+        oam[i].attr0.shape = 0;
+        oam[i].attr1.x     = 0;
+        oam[i].attr1.size  = 0;
+        oam[i].attr2.tile  = 0;
+        oam[i].attr2.palbank = 0;
+        oam[i].pad         = 0;
     }
 
     for (int t = 0; t < 4; t++) {
@@ -178,30 +198,34 @@ void main(void) {
             }
         }
 
-        struct sprite sprite[] = {
+        struct oam sprite[] = {
             {
-                .attr0 = (left_y & 0xFF) | 0x8000, /* tall */
-                .attr1 = (10 & 0x1FF) | 0x4000,               /* x */
-                .attr2 = 0 | (0<<12),              /* tile 0, palbank 0 */
+                .attr0 = { .y = (uint16_t)left_y,  .hide = 0, .shape = 2 },
+                .attr1 = { .x = 10,               .size = 1 },
+                .attr2 = { .tile = 0,             .palbank = 0 },
+                .pad   = 0,
             },
             {
-                .attr0 = (right_y & 0xFF) | 0x8000,
-                .attr1 = ((W-10-8) & 0x1FF) | 0x4000,
-                .attr2 = 0 | (1<<12),              /* palbank 1 */
+                .attr0 = { .y = (uint16_t)right_y, .hide = 0, .shape = 2 },
+                .attr1 = { .x = (uint16_t)(W-10-8), .size = 1 },
+                .attr2 = { .tile = 0,              .palbank = 1 },
+                .pad   = 0,
             },
             {
-                .attr0 = ((int)ball_y & 0xFF) | (winner ? disable : 0),
-                .attr1 = (int)ball_x & 0x1FF,
-                .attr2 = 4 | (0<<12),             /* tile 4, palbank 0 */
+                .attr0 = { .y = (uint16_t)ball_y, .hide = (uint16_t)winner, .shape = 0 },
+                .attr1 = { .x = (uint16_t)ball_x, .size = 0 },
+                .attr2 = { .tile = 4,             .palbank = 0 },
+                .pad   = 0,
             },
         };
 
         vsync();
 
         for (int i = 0; i < len(sprite); i++) {
-            oam[i].sprite.attr0 = sprite[i].attr0;
-            oam[i].sprite.attr1 = sprite[i].attr1;
-            oam[i].sprite.attr2 = sprite[i].attr2;
+            oam[i].attr0 = sprite[i].attr0;
+            oam[i].attr1 = sprite[i].attr1;
+            oam[i].attr2 = sprite[i].attr2;
+            oam[i].pad   = 0;
         }
         bg_draw_num( 3,1, score_l);
         bg_draw_num(27,1, score_r);
