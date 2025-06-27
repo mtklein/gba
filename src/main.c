@@ -37,12 +37,13 @@ static struct oam volatile *const oam = (struct oam volatile*)0x07000000;
 static void font_to_tile(uint16_t volatile *tile, const uint8_t glyph[8]) {
     for (int r = 0; r < 8; r++) {
         uint8_t const bits = glyph[r];
-        uint8_t nib[8];
+        uint32_t mask = 0;
         for (int c = 0; c < 8; c++) {
-            nib[c] = (bits & (1 << (7 - c))) ? 0x1 : 0x0;
+            uint32_t nib = (bits & (1 << (7 - c))) ? 0x1u : 0x0u;
+            mask |= nib << (c*4);
         }
-        tile[r*2 + 0] = (uint16_t)(nib[0] | (nib[1] << 4) | (nib[2] << 8) | (nib[3] << 12));
-        tile[r*2 + 1] = (uint16_t)(nib[4] | (nib[5] << 4) | (nib[6] << 8) | (nib[7] << 12));
+        tile[r*2 + 0] = (uint16_t)( mask        & 0xFFFFu);
+        tile[r*2 + 1] = (uint16_t)((mask >> 16) & 0xFFFFu);
     }
 }
 
