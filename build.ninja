@@ -13,7 +13,7 @@ rule compile
             -Wno-switch-default $
             -Wno-unsafe-buffer-usage
 rule link
-  command = PATH=$path ld.lld -oformat=binary -T $in -o $out
+  command = PATH=$path ld.lld --oformat=binary -T $in -o $out
 
 build out/gba_header.o: assemble src/gba_header.s
 build out/crt0.o:       assemble src/crt0.s
