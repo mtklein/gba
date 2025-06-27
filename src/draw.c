@@ -72,8 +72,9 @@ static void font_to_tile(uint16_t *dst, const uint8_t src[8]) {
 void draw_init(void) {
     /* Step 2: switch to tile background mode */
     uint16_t const mode0 = 0,
-                     bg0   = 1<<8;
-    *reg_dispcnt = mode0 | bg0;
+                     bg0  = 1<<8,
+                     obj  = 1<<12;
+    *reg_dispcnt = mode0 | bg0 | obj;
 
     /* BG0: charblock 0, screenblock 31, 4bpp */
     *reg_bg0cnt = (0<<2) | (0<<7) | (31<<8);
