@@ -2,7 +2,8 @@
 #include "font.h"
 
 static uint16_t volatile *reg_dispcnt = (uint16_t volatile*)0x04000000,
-                         *reg_vcount  = (uint16_t volatile*)0x04000006;
+                         *reg_vcount  = (uint16_t volatile*)0x04000006,
+                         *reg_bg0cnt  = (uint16_t volatile*)0x04000008;
 
 struct DMA {
     void const *src;
@@ -14,21 +15,31 @@ static struct DMA volatile *dma = (struct DMA volatile*)0x040000B0;
 struct rgb555 *palette = (struct rgb555*)0x05000000;
 
 void draw_init(void) {
-    uint16_t const mode4 = 4,
-                     bg2 = 1<<10;
-    *reg_dispcnt = mode4 | bg2;
+    /* Step 2: switch to tile background mode */
+    uint16_t const mode0 = 0,
+                     bg0   = 1<<8;
+    *reg_dispcnt = mode0 | bg0;
+
+    /* BG0: charblock 0, screenblock 31, 4bpp */
+    *reg_bg0cnt = (0<<2) | (0<<7) | (31<<8);
+
+    uint16_t *tilemem  = (uint16_t*)0x06000000;
+    uint16_t *mapmem   = (uint16_t*)0x0600F800;
+
+    /* simple tile filled with palette index 1 */
+    for (int i = 0; i < 16; i++) {
+        tilemem[i] = 0x1111;
+    }
+    for (int i = 0; i < 32*32; i++) {
+        mapmem[i] = 1;
+    }
 }
 
 struct fb* vsync_swap(void) {
     while (*reg_vcount >= H);
     while (*reg_vcount <  H);
 
-    *reg_dispcnt ^= (1<<4);
-    if (*reg_dispcnt & (1<<4)) {
-        return (struct fb*)0x06000000;
-    } else {
-        return (struct fb*)0x0600A000;
-    }
+    return (struct fb*)0x06000000; /* unused in tile mode */
 }
 
 void set_pixel(struct fb *fb, uint8_t color, int x, int y) {
