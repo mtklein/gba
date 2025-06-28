@@ -1,4 +1,9 @@
 #include "font.h"
+#include "sprites.h"
+
+static void mem_copy(uint16_t volatile *dst, const uint16_t *src, int count) {
+    for (int i = 0; i < count; i++) dst[i] = src[i];
+}
 #include <stdint.h>
 
 #define len(x) (int)(sizeof x / sizeof *x)
@@ -63,6 +68,16 @@ static struct rgb555 const star_colors[] = {
     { 0, 0,31}, {31, 0,31}, {31,15, 0}, {15, 0,31},
 };
 
+static struct rgb555 const spectator_palette[] = {
+    {31,31,31}, // transparent / white
+    { 0, 0, 0}, // black outline
+    {31,24,16}, // skin
+    { 0, 0,31}, // shirt
+    {10,10,10}, // pants
+    {24,12, 0}, // hair
+    {31,31,31}, // eye white
+};
+
 struct oam {
     struct {
         uint16_t y       :  8;
@@ -90,6 +105,29 @@ struct star {
     uint8_t palbank;
     uint8_t pad[3];
 };
+
+enum {
+    TILE_PADDLE       = 0,
+    TILE_BALL         = 4,
+    TILE_STAR         = 5,
+    TILE_SPEC_MALE_SKINNY = 6,
+    TILE_SPEC_MALE_NORMAL = TILE_SPEC_MALE_SKINNY + 9,
+    TILE_SPEC_MALE_STRONG = TILE_SPEC_MALE_NORMAL + 9,
+    TILE_SPEC_FEMALE_SKINNY = TILE_SPEC_MALE_STRONG + 9,
+    TILE_SPEC_FEMALE_NORMAL = TILE_SPEC_FEMALE_SKINNY + 9,
+    TILE_SPEC_FEMALE_STRONG = TILE_SPEC_FEMALE_NORMAL + 9,
+};
+
+#define SPEC_COUNT 6
+static const struct { int tile; int x; } spectator_info[SPEC_COUNT] = {
+    {TILE_SPEC_MALE_SKINNY,  10},
+    {TILE_SPEC_MALE_NORMAL,  46},
+    {TILE_SPEC_MALE_STRONG,  82},
+    {TILE_SPEC_FEMALE_SKINNY,118},
+    {TILE_SPEC_FEMALE_NORMAL,154},
+    {TILE_SPEC_FEMALE_STRONG,190},
+};
+static const int spectator_y = H - 24;
 
 static void font_to_tile(uint16_t volatile *tile, const uint8_t glyph[8]) {
     for (int r = 0; r < 8; r++) {
@@ -153,6 +191,15 @@ void main(void) {
         obj_palette[base + 1] = star_colors[i];
     }
 
+    int spec_base = 10 * 16;
+    obj_palette[spec_base + 0] = spectator_palette[0];
+    obj_palette[spec_base + 1] = spectator_palette[1];
+    obj_palette[spec_base + 2] = spectator_palette[2];
+    obj_palette[spec_base + 3] = spectator_palette[3];
+    obj_palette[spec_base + 4] = spectator_palette[4];
+    obj_palette[spec_base + 5] = spectator_palette[5];
+    obj_palette[spec_base + 6] = spectator_palette[6];
+
     for (int ch = 32; ch < 127; ch++) {
         font_to_tile(bg_tiles + (ch-32+1)*16, font_get((char)ch));
     }
@@ -186,6 +233,19 @@ void main(void) {
     for (int i = 0; i < 16; i++) {
         obj_tiles[5*16 + i] = star_tile[i];
     }
+
+    int tile_off = TILE_SPEC_MALE_SKINNY * 16;
+    mem_copy(obj_tiles + tile_off, spectator_male_skinny, len(spectator_male_skinny));
+    tile_off += 9*16;
+    mem_copy(obj_tiles + tile_off, spectator_male_normal, len(spectator_male_normal));
+    tile_off += 9*16;
+    mem_copy(obj_tiles + tile_off, spectator_male_strong, len(spectator_male_strong));
+    tile_off += 9*16;
+    mem_copy(obj_tiles + tile_off, spectator_female_skinny, len(spectator_female_skinny));
+    tile_off += 9*16;
+    mem_copy(obj_tiles + tile_off, spectator_female_normal, len(spectator_female_normal));
+    tile_off += 9*16;
+    mem_copy(obj_tiles + tile_off, spectator_female_strong, len(spectator_female_strong));
 
     struct star stars[9];
     for (int i = 0; i < len(stars); i++) {
@@ -300,7 +360,7 @@ void main(void) {
             }
         }
 
-        struct oam sprite[3 + len(stars)];
+        struct oam sprite[3 + len(stars) + SPEC_COUNT*9];
         sprite[0] = (struct oam){
             .attr0 = { .y = left_y, .shape = 2 },
             .attr1 = { .x =     10, .size  = 1 },
@@ -316,12 +376,27 @@ void main(void) {
             .attr1 = { .x = ball_x, .size  = 0 },
             .attr2 = { .tile = 4, .palbank = 0 },
         };
+        int idx = 3;
         for (int i = 0; i < len(stars); i++) {
-            sprite[3+i] = (struct oam){
+            sprite[idx++] = (struct oam){
                 .attr0 = { .y = stars[i].y, .shape = 0, .hide = !winner },
                 .attr1 = { .x = stars[i].x, .size  = 0 },
                 .attr2 = { .tile = 5, .palbank = stars[i].palbank },
             };
+        }
+
+        for (int s = 0; s < SPEC_COUNT; s++) {
+            int base = spectator_info[s].tile;
+            int x = spectator_info[s].x;
+            for (int r = 0; r < 3; r++) {
+                for (int c = 0; c < 3; c++) {
+                    sprite[idx++] = (struct oam){
+                        .attr0 = { .y = (uint16_t)(spectator_y + r*8), .shape = 0 },
+                        .attr1 = { .x = (uint16_t)(x + c*8), .size = 0 },
+                        .attr2 = { .tile = (uint16_t)(base + r*3 + c), .palbank = 10 },
+                    };
+                }
+            }
         }
 
         vsync();
